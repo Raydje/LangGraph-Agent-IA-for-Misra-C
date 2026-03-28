@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # LLM
     gemini_api_key: str
     gemini_model: str = "gemini-2.0-flash"
-    gemini_embedding_model: str = "models/embedding-001"
+    gemini_embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 768
 
     # Pinecone
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     pinecone_region: str = "us-east-1"
 
     # MongoDB
-    mongodb_uri: str = "mongodb://localhost:27017"
+    mongodb_uri: str
     mongodb_database: str = "compliance_db"
     mongodb_collection: str = "rules"
 

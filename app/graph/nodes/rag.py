@@ -1,107 +1,68 @@
-import re
+# app/graph/nodes/rag.py
+
+from typing import Any
 from app.models.state import ComplianceState, RetrievedRule
 from app.services.embedding_service import get_embedding
 from app.services.pinecone_service import query_pinecone
-from app.services.mongodb_service import get_rules_by_ids, get_rules_by_metadata
+from app.services.mongodb_service import get_rules_by_ids
 
+async def rag_node(state: ComplianceState) -> dict[str, Any]:
+    """
+    LangGraph node responsible for hybrid retrieval.
+    Currently focused strictly on fetching MISRA-C rules using Pinecone (vector search)
+    and MongoDB (document retrieval).
+    """
+    query = state.get("query", "")
+    
+    # 1. Embed the user's query
+    vector = await get_embedding(query)
 
-async def rag_node(state: ComplianceState) -> dict:
-    query = state["query"]
-    standard = state.get("standard", "DO-178B")
+    # 2. Build metadata filters strictly for MISRA-C
+    # Based on your ingest script, we lock the scope to MISRA-C 
+    # so we don't accidentally retrieve any other standards later.
+    metadata_filters = {"scope": "MISRA-C"}
 
-    # Step 1: Generate embedding for the query
-    query_embedding = await get_embedding(query)
-
-    # Step 2: Semantic search in Pinecone
+    # 3. Query Pinecone for top K matches (semantic search)
+    # Fetching the top 5 most relevant MISRA-C rules
     pinecone_results = await query_pinecone(
-        vector=query_embedding,
+        vector=vector,
         top_k=5,
-        filter={"standard": standard},
+        filter=metadata_filters
     )
 
-    # Step 3: Extract rule_ids and scores
-    semantic_hits = {
-        match["id"]: match["score"]
-        for match in pinecone_results.get("matches", [])
-    }
-    rule_ids = list(semantic_hits.keys())
+    matches = pinecone_results.get("matches", [])
+    
+    # Extract the IDs and keep track of their relevance scores
+    rule_ids = [match["id"] for match in matches]
+    scores_map = {match["id"]: match.get("score", 0.0) for match in matches}
 
-    # Step 4: Enrich from MongoDB (full text + metadata)
-    mongo_rules = await get_rules_by_ids(rule_ids) if rule_ids else []
+    retrieved_rules: list[RetrievedRule] = []
 
-    # Step 5: Extract metadata filters from query
-    dal_keywords = _extract_dal_level(query)
-    section_keywords = _extract_section_ref(query)
+    if rule_ids:
+        # 4. Fetch the full MISRA-C documents from MongoDB
+        mongo_docs = await get_rules_by_ids(rule_ids)
 
-    metadata_filters = {}
-    if dal_keywords:
-        metadata_filters["dal_level"] = {"$in": dal_keywords}
-    if section_keywords:
-        metadata_filters["section"] = {"$regex": section_keywords, "$options": "i"}
+        # 5. Format the documents into the TypedDict expected by LangGraph
+        for doc in mongo_docs:
+            r_id = doc.get("rule_id", "")
+            
+            rule_entry: RetrievedRule = {
+                "rule_id": r_id,
+                "standard": "MISRA-C", # Hardcoded for now
+                "section": doc.get("section", ""),
+                "dal_level": doc.get("dal_level", "N/A"), # Mostly a DO-178B concept, kept for State compatibility
+                "title": doc.get("title", f"Rule {r_id}"),
+                "full_text": doc.get("full_text", doc.get("text", "")),
+                "relevance_score": scores_map.get(r_id, 0.0)
+            }
+            retrieved_rules.append(rule_entry)
 
-    # Step 6: Supplemental MongoDB metadata search
-    supplemental_rules = []
-    if metadata_filters:
-        metadata_filters["standard"] = standard
-        supplemental_rules = await get_rules_by_metadata(metadata_filters)
+        # Ensure the final list is sorted by relevance score descending 
+        retrieved_rules.sort(key=lambda x: x["relevance_score"], reverse=True)
 
-    # Step 7: Merge and deduplicate
-    merged = _merge_results(mongo_rules, supplemental_rules, semantic_hits)
-
+    # 6. Return the state update dictionary.
     return {
-        "retrieved_rules": merged,
+        "retrieved_rules": retrieved_rules,
         "rag_query_used": query,
-        "metadata_filters_applied": metadata_filters,
+        "metadata_filters_applied": metadata_filters
     }
-
-
-def _extract_dal_level(query: str) -> list[str]:
-    matches = re.findall(
-        r"(?:level|dal|assurance level)\s*([A-E])", query, re.IGNORECASE
-    )
-    return [m.upper() for m in matches]
-
-
-def _extract_section_ref(query: str) -> str | None:
-    match = re.search(r"\b(\d+\.\d+(?:\.\d+)?)\b", query)
-    return match.group(1) if match else None
-
-
-def _merge_results(
-    mongo_rules: list[dict],
-    supplemental: list[dict],
-    semantic_scores: dict[str, float],
-) -> list[RetrievedRule]:
-    seen = set()
-    results: list[RetrievedRule] = []
-
-    for rule in mongo_rules:
-        rid = rule["rule_id"]
-        if rid not in seen:
-            seen.add(rid)
-            results.append(RetrievedRule(
-                rule_id=rid,
-                standard=rule["standard"],
-                section=rule["section"],
-                dal_level=rule["dal_level"],
-                title=rule["title"],
-                full_text=rule["full_text"],
-                relevance_score=semantic_scores.get(rid, 0.0),
-            ))
-
-    for rule in supplemental:
-        rid = rule["rule_id"]
-        if rid not in seen:
-            seen.add(rid)
-            results.append(RetrievedRule(
-                rule_id=rid,
-                standard=rule["standard"],
-                section=rule["section"],
-                dal_level=rule["dal_level"],
-                title=rule["title"],
-                full_text=rule["full_text"],
-                relevance_score=0.0,
-            ))
-
-    results.sort(key=lambda r: r["relevance_score"], reverse=True)
-    return results[:10]
