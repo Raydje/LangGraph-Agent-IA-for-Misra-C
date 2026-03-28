@@ -38,7 +38,19 @@ async def query_pinecone(
         filter=filter,
         include_metadata=True,
     )
-    return results.to_dict()
+    print(f"Pinecone query returned {len(results.matches)} matches.")
+    for i, match in enumerate(results.matches):
+        print(f"  Match {i+1}: ID={match.id}, Score={match.score:.4f}, Metadata={match.metadata}")
+    return {
+        "matches": [
+            {
+                "id": m.id,
+                "score": m.score,
+                "metadata": m.metadata or {},
+            }
+            for m in results.matches
+        ]
+    }
 
 
 async def upsert_vectors(vectors: list[dict]) -> None:
