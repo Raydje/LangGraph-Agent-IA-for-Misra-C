@@ -4,7 +4,7 @@ from typing import Any
 from app.models.state import ComplianceState, RetrievedRule
 from app.services.embedding_service import get_embedding
 from app.services.pinecone_service import query_pinecone
-from app.services.mongodb_service import get_rules_by_ids
+from app.services.mongodb_service import get_misra_rules_by_pinecone_ids
 
 async def rag_node(state: ComplianceState) -> dict[str, Any]:
     """
@@ -20,7 +20,7 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
     # 2. Build metadata filters strictly for MISRA-C
     # Based on your ingest script, we lock the scope to MISRA-C 
     # so we don't accidentally retrieve any other standards later.
-    metadata_filters = {"scope": "MISRA-C"}
+    metadata_filters = {"scope": "MISRA C:2023"}
 
     # 3. Query Pinecone for top K matches (semantic search)
     # Fetching the top 5 most relevant MISRA-C rules
@@ -31,7 +31,8 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
     )
 
     matches = pinecone_results.get("matches", [])
-    
+    for i, match in enumerate(matches):
+        print(f"  Match {i+1}: ID={match['id']}, Score={match['score']:.4f}, Metadata={match['metadata']}")
     # Extract the IDs and keep track of their relevance scores
     rule_ids = [match["id"] for match in matches]
     scores_map = {match["id"]: match.get("score", 0.0) for match in matches}
@@ -40,7 +41,7 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
 
     if rule_ids:
         # 4. Fetch the full MISRA-C documents from MongoDB
-        mongo_docs = await get_rules_by_ids(rule_ids)
+        mongo_docs = await get_misra_rules_by_pinecone_ids(rule_ids)
 
         # 5. Format the documents into the TypedDict expected by LangGraph
         for doc in mongo_docs:

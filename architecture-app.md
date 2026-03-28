@@ -29,3 +29,17 @@ MyProjectCv/
     └── data/
         ├── seed_rules.py         # 10 DO-178B compliance rules
         └── ingest.py             # Seeds Pinecone + MongoDB
+tests/
+└── unit/
+    ├── services/
+    │   ├── test_mongodb_service.py   # Unit tests for MongoDB CRUD functions
+    │   ├── test_embedding_service.py # Unit tests for get_embedding()
+    │   └── test_pinecone_service.py  # Unit tests for query/upsert
+    ├── graph/
+    │   ├── nodes/
+    │   │   ├── test_orchestrator.py  # Intent classification tests
+    │   │   ├── test_rag.py           # Hybrid retrieval tests
+    │   │   ├── test_validation.py    # Compliance checker tests
+    │   │   └── test_critique.py      # Hallucination reviewer tests
+    │   └── test_edges.py             # Route logic tests
+    └── conftest.py                   # Shared fixtures (mock DB, mock LLM, etc.)
