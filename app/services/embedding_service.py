@@ -26,9 +26,9 @@ class EmbeddingService:
             output_dimensionality=settings.embedding_dimensions,
         )
 
-    async def embed_and_store(self, rules: list[dict]) -> None:
+    async def embed_and_store(self, rules: list[dict]) -> int:
         if not rules:
-            return
+            return 0
 
         print(f"Generating embeddings for {len(rules)} rules...")
         
@@ -57,5 +57,6 @@ class EmbeddingService:
             })
 
         print("Delegating upload to pinecone_service...")
-        await upsert_vectors(vectors)
+        upserted = await upsert_vectors(vectors)
         print(f"✅ Successfully passed {len(vectors)} embeddings to Pinecone!")
+        return upserted

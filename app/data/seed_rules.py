@@ -160,4 +160,153 @@ SEED_RULES = [
         ),
         "keywords": ["SAS", "accomplishment summary", "compliance", "certification", "Level A"],
     },
+    # Table A-3: Verification of Outputs of Software Requirements Process
+    {
+        "rule_id": "DO178B-REQ-011",
+        "standard": "DO-178B",
+        "section": "Table A-3 Objective 1",
+        "dal_level": "A, B, C, D",
+        "title": "High-level requirements comply with system requirements",
+        "full_text": "High-level requirements (HLR) must be developed and verified to ensure they accurately reflect the system requirements allocated to software.",
+        "keywords": ["HLR", "system requirements", "compliance"],
+    },
+    {
+        "rule_id": "DO178B-REQ-012",
+        "standard": "DO-178B",
+        "section": "Table A-3 Objective 6",
+        "dal_level": "A, B, C",
+        "title": "HLR Traceability to System Requirements",
+        "full_text": "Bi-directional traceability must exist between high-level requirements and the system requirements they satisfy.",
+        "keywords": ["traceability", "HLR", "system requirements"],
+    },
+
+    # Table A-4: Verification of Outputs of Software Design Process
+    {
+        "rule_id": "DO178B-REQ-013",
+        "standard": "DO-178B",
+        "section": "Table A-4 Objective 1",
+        "dal_level": "A, B, C",
+        "title": "Low-level requirements comply with high-level requirements",
+        "full_text": "Low-level requirements (LLR) and the software architecture must comply with and be traceable to the high-level requirements.",
+        "keywords": ["LLR", "HLR", "architecture", "design"],
+    },
+    {
+        "rule_id": "DO178B-REQ-014",
+        "standard": "DO-178B",
+        "section": "Table A-4 Objective 8",
+        "dal_level": "A, B, C",
+        "title": "Software architecture is consistent",
+        "full_text": "The software architecture components must have consistent data flow and control flow relationships.",
+        "keywords": ["architecture", "data flow", "control flow"],
+    },
+
+    # Table A-5: Verification of Outputs of Software Coding and Integration Process
+    {
+        "rule_id": "DO178B-REQ-015",
+        "standard": "DO-178B",
+        "section": "Table A-5 Objective 1",
+        "dal_level": "A, B, C",
+        "title": "Source Code complies with Low-Level Requirements",
+        "full_text": "The Source Code must be verified for compliance with the low-level requirements through review or analysis.",
+        "keywords": ["source code", "LLR", "verification"],
+    },
+    {
+        "rule_id": "DO178B-REQ-016",
+        "standard": "DO-178B",
+        "section": "Table A-5 Objective 2",
+        "dal_level": "A, B, C",
+        "title": "Source Code complies with Software Architecture",
+        "full_text": "The Source Code must be verified for compliance with the software architecture (e.g., partitioning schemes).",
+        "keywords": ["source code", "architecture", "partitioning"],
+    },
+    {
+        "rule_id": "DO178B-REQ-017",
+        "standard": "DO-178B",
+        "section": "Table A-5 Objective 4",
+        "dal_level": "A, B, C",
+        "title": "Source Code complies with Software Coding Standards",
+        "full_text": "Source Code must be reviewed for compliance with defined coding standards (e.g., naming conventions, complexity limits).",
+        "keywords": ["coding standards", "naming", "complexity"],
+    },
+
+    # Table A-7: Verification of Verification Process Results
+    {
+        "rule_id": "DO178B-REQ-018",
+        "standard": "DO-178B",
+        "section": "Table A-7 Objective 5",
+        "dal_level": "A, B, C",
+        "title": "Statement Coverage Analysis",
+        "full_text": "For Level A, B, and C software, every executable statement in the code must be exercised by requirements-based tests.",
+        "keywords": ["statement coverage", "testing", "structural analysis"],
+    },
+    {
+        "rule_id": "DO178B-REQ-019",
+        "standard": "DO-178B",
+        "section": "Table A-7 Objective 7",
+        "dal_level": "A",
+        "title": "Modified Condition/Decision Coverage (MC/DC)",
+        "full_text": "For Level A software, every condition in a decision must be shown to independently affect the output of that decision.",
+        "keywords": ["MC/DC", "decision coverage", "Level A"],
+    },
+
+    # Table A-9: Software Quality Assurance Process
+    {
+        "rule_id": "DO178B-REQ-020",
+        "standard": "DO-178B",
+        "section": "Table A-9 Objective 1",
+        "dal_level": "A, B, C, D",
+        "title": "QA compliance with plans and standards",
+        "full_text": "Assurance is obtained that software development and integral processes comply with approved plans and standards.",
+        "keywords": ["QA", "audit", "process assurance"],
+    },
+    # --- TABLE A-5 OBJECTIVES (Coding) ---
+    {
+        "rule_id": "DO178B-REQ-021",
+        "standard": "DO-178B",
+        "section": "Table A-5 Objective 3",
+        "dal_level": "A, B, C",
+        "title": "Source Code is Verifiable",
+        "full_text": "The Source Code must be structured and documented such that it can be verified. This involves avoiding complex or non-deterministic constructs that impede analysis.",
+        "keywords": ["verifiable", "complexity", "code analysis"],
+    },
+    {
+        "rule_id": "DO178B-REQ-022",
+        "standard": "DO-178B",
+        "section": "Table A-5 Objective 5",
+        "dal_level": "A, B, C",
+        "title": "Source Code Accuracy and Consistency",
+        "full_text": "Source Code must be accurate and consistent with the Low-Level Requirements, ensuring no unintended functionality is introduced.",
+        "keywords": ["accuracy", "consistency", "unintended functionality"],
+    },
+
+    # --- TABLE A-7 OBJECTIVES (Verification) ---
+    {
+        "rule_id": "DO178B-REQ-023",
+        "standard": "DO-178B",
+        "section": "Table A-7 Objective 5",
+        "dal_level": "A, B",
+        "title": "Decision Coverage Analysis",
+        "full_text": "Verification must show that every decision in the program has taken all possible outcomes at least once.",
+        "keywords": ["decision coverage", "structural coverage", "Level B"],
+    },
+    {
+        "rule_id": "DO178B-REQ-024",
+        "standard": "DO-178B",
+        "section": "Table A-7 Objective 8",
+        "dal_level": "A, B",
+        "title": "Data Coupling and Control Coupling",
+        "full_text": "Structural coverage analysis shall confirm the requirements-based testing has exercised the data and control coupling between code components.",
+        "keywords": ["data coupling", "control coupling", "integration"],
+    },
+
+    # --- TABLE A-6 (Integration Testing) ---
+    {
+        "rule_id": "DO178B-REQ-025",
+        "standard": "DO-178B",
+        "section": "Table A-6 Objective 1",
+        "dal_level": "A, B, C, D",
+        "title": "Executable Object Code complies with HLR",
+        "full_text": "The Executable Object Code (EOC) must be tested to demonstrate compliance with the High-Level Requirements.",
+        "keywords": ["EOC", "testing", "HLR compliance"],
+    }        
 ]

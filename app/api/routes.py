@@ -81,9 +81,9 @@ async def query_compliance(request: ComplianceQueryRequest):
 async def seed_database():
     """Endpoint to trigger the ingestion of rules into MongoDB and Pinecone."""
     from app.data.ingest import main as ingest
-    await ingest()
+    result = await ingest()
     return IngestResponse(
         message="Seed data ingested successfully",
-        rules_ingested=10,
-        vectors_upserted=10,
+        rules_ingested=result.get("rules_ingested", 0),
+        vectors_upserted=result.get("vectors_upserted", 0),
     )

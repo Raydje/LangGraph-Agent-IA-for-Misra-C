@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 async def lifespan(app: FastAPI):
     """Logs configuration on startup to ensure environment variables are loaded."""
     settings = get_settings()
-    print(f"[Startup] Loaded config for standard: DO-178B / MISRA C:2023")
+    print(f"[Startup] Loaded config for standard: MISRA C:2023")
     print(f"[Startup] Gemini model: {settings.gemini_model}")
     print(f"[Startup] MongoDB: {settings.mongodb_uri}/{settings.mongodb_database}")
     print(f"[Startup] Pinecone index: {settings.pinecone_index_name}")
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI app with metadata for Swagger UI
 app = FastAPI(
-    title="DO-178B & MISRA C:2023 Compliance Agent",
+    title="MISRA C:2023 Compliance Agent",
     description="Autonomous regulatory compliance analysis using a LangGraph multi-agent system.",
     version="0.1.0",
     lifespan=lifespan,
