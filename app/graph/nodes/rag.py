@@ -9,7 +9,7 @@ from app.services.mongodb_service import get_misra_rules_by_pinecone_ids
 async def rag_node(state: ComplianceState) -> dict[str, Any]:
     """
     LangGraph node responsible for hybrid retrieval.
-    Currently focused strictly on fetching MISRA-C rules using Pinecone (vector search)
+    Currently focused strictly on fetching MISRA C:2023 rules using Pinecone (vector search)
     and MongoDB (document retrieval).
     """
     query = state.get("query", "")
@@ -17,13 +17,13 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
     # 1. Embed the user's query
     vector = await get_embedding(query)
 
-    # 2. Build metadata filters strictly for MISRA-C
-    # Based on your ingest script, we lock the scope to MISRA-C 
+    # 2. Build metadata filters strictly for MISRA C:2023
+    # Based on your ingest script, we lock the scope to MISRA C:2023 
     # so we don't accidentally retrieve any other standards later.
     metadata_filters = {"scope": "MISRA C:2023"}
 
     # 3. Query Pinecone for top K matches (semantic search)
-    # Fetching the top 5 most relevant MISRA-C rules
+    # Fetching the top 5 most relevant MISRA C:2023 rules
     pinecone_results = await query_pinecone(
         vector=vector,
         top_k=5,
@@ -38,7 +38,7 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
     retrieved_rules: list[RetrievedRule] = []
 
     if rule_ids:
-        # 4. Fetch the full MISRA-C documents from MongoDB
+        # 4. Fetch the full MISRA C:2023 documents from MongoDB
         mongo_docs = await get_misra_rules_by_pinecone_ids(rule_ids)
 
         # 5. Format the documents into the TypedDict expected by LangGraph
@@ -47,7 +47,7 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
             
             rule_entry: RetrievedRule = {
                 "rule_id": r_id,
-                "standard": "MISRA-C", # Hardcoded for now
+                "standard": "MISRA C:2023", # Hardcoded for now
                 "section": doc.get("section", ""),
                 "dal_level": doc.get("dal_level", "N/A"), # Mostly a DO-178B concept, kept for State compatibility
                 "title": doc.get("title", f"Rule {r_id}"),

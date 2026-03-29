@@ -7,7 +7,7 @@ from app.utils import parse_json_response
 
 def validation_node(state: ComplianceState) -> dict:
     """
-    Evaluates the provided code snippet against the retrieved MISRA-C 2023 rules.
+    Evaluates the provided code snippet against the retrieved MISRA C:2023 rules.
     Takes critique feedback into account if this is a subsequent iteration.
     """
     print("--- NODE: VALIDATION ---")
@@ -20,16 +20,16 @@ def validation_node(state: ComplianceState) -> dict:
     critique_feedback = state.get("critique_feedback", "")
     iteration = state.get("iteration_count", 0)
 
-    # Format retrieved rules — MISRA-C IDs are either "Dir X.Y" or "Rule X.Y"
+    # Format retrieved rules — MISRA C:2023 IDs are either "Dir X.Y" or "Rule X.Y"
     rules_context = "\n\n".join(
         [f"Rule ID: {r['rule_id']}\nCategory: {r.get('dal_level', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"
          for r in rules]
     )
 
-    system_prompt = """You are a strict, expert compliance auditor for MISRA-C 2023.
-Your task is to validate the provided C/C++ code against the provided MISRA-C 2023 rules.
+    system_prompt = """You are a strict, expert compliance auditor for MISRA C:2023.
+Your task is to validate the provided C/C++ code against the provided MISRA C:2023 rules.
 
-MISRA-C 2023 rule IDs follow these formats:
+MISRA C:2023 rule IDs follow these formats:
 - Directives: "Dir X.Y" (e.g., "Dir 4.1")
 - Rules: "Rule X.Y" (e.g., "Rule 15.5")
 Categories are: Mandatory, Required, or Advisory.
@@ -46,7 +46,7 @@ Field details:
 - "is_compliant": true only if the code fully satisfies all applicable retrieved rules.
 - "validation_result": detailed explanation of each violation or confirmation of compliance. Reference specific lines when possible.
 - "confidence_score": float between 0.0 and 1.0.
-- "cited_rules": list of MISRA-C 2023 rule IDs used in the evaluation (e.g., ["Rule 15.5", "Dir 4.1"]).
+- "cited_rules": list of MISRA C:2023 rule IDs used in the evaluation (e.g., ["Rule 15.5", "Dir 4.1"]).
 
 Do not include any text outside the JSON block."""
 
@@ -61,8 +61,8 @@ Address all points raised above in your revised evaluation.
 
     human_content = f"""User Query: {query}
 
-Retrieved MISRA-C 2023 Rules:
-{rules_context if rules_context else "No specific rules retrieved. Apply general MISRA-C 2023 knowledge strictly relevant to the query."}
+Retrieved MISRA C:2023 Rules:
+{rules_context if rules_context else "No specific rules retrieved. Apply general MISRA C:2023 knowledge strictly relevant to the query."}
 
 Code to Validate:
 ```c

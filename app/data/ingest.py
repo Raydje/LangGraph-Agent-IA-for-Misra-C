@@ -21,7 +21,7 @@ from app.services.mongodb_service import insert_rules, create_indexes, get_rules
 
 def parse_misra_file(filepath: str) -> list[dict]:
     """
-    Parses the MISRA-C text file and extracts structured metadata.
+    Parses the MISRA C:2023 text file and extracts structured metadata.
     """
     rules = []
     
@@ -109,28 +109,32 @@ async def upload_to_mongodb(rules: list[dict]):
         print(f"   - Inserted: {result.upserted_count}")
         print(f"   - Modified: {result.modified_count}")
 
-async def main():
+async def main() -> dict:
     # Test the parser
     target_file = "data/misra_c_2023__headlines_for_cppcheck.txt"
     parsed_rules = parse_misra_file(target_file)
-    
+
     if parsed_rules:
         print(f"✅ Successfully parsed {len(parsed_rules)} rules!\n")
         print("Sample of the first parsed rule:")
         print(json.dumps(parsed_rules[0], indent=2))
-        
+
         # You can also verify the last rule to ensure the loop finished correctly
         print("\nSample of the last parsed rule:")
         print(json.dumps(parsed_rules[-1], indent=2))
-        
+
         # Now upload to MongoDB
         print("2. Uploading to MongoDB...")
         await upload_to_mongodb(parsed_rules)
-        
+
         print("3. Uploading to Pinecone...")
         embedder = EmbeddingService()
         # Add 'await' here!
-        await embedder.embed_and_store(parsed_rules)
+        vectors_upserted = await embedder.embed_and_store(parsed_rules)
+
+        return {"rules_ingested": len(parsed_rules), "vectors_upserted": vectors_upserted}
+
+    return {"rules_ingested": 0, "vectors_upserted": 0}
         
 if __name__ == "__main__":
     # Run the async main function

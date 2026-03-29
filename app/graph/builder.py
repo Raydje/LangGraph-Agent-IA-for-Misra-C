@@ -25,7 +25,7 @@ def assemble_node(state: ComplianceState) -> dict:
         return {"final_response": f"An error occurred: {state['error']}"}
 
     intent = state.get("intent", "search")
-    standard = state.get("standard", "MISRA-C 2023")
+    standard = state.get("standard", "MISRA C:2023")
 
     if intent == "validate":
         compliant = state.get("is_compliant")

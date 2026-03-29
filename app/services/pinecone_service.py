@@ -51,9 +51,12 @@ async def query_pinecone(
     }
 
 
-async def upsert_vectors(vectors: list[dict]) -> None:
+async def upsert_vectors(vectors: list[dict]) -> int:
     index = _get_index()
     batch_size = 100
+    total = 0
     for i in range(0, len(vectors), batch_size):
         batch = vectors[i : i + batch_size]
         index.upsert(vectors=batch)
+        total += len(batch)
+    return total

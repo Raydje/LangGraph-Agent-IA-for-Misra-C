@@ -59,8 +59,11 @@ async def get_misra_rules_by_pinecone_ids(rule_ids: list[str]) -> list[dict]:
 
 
 async def get_rules_by_metadata(filters: dict) -> list[dict]:
+    """ find misra rules by metadata fields like section and rule_number 
+        example filters: {"section": "3", "rule_number": "4"} for MISRA 3.4
+    """
     coll = await get_rules_collection()
-    cursor = coll.find(filters, {"_id": 0}).hint(_INDEX_FIELDS)
+    cursor = coll.find(filters, {"_id": 0})
     return await cursor.to_list(length=100)
 
 

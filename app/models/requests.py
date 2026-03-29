@@ -6,14 +6,14 @@ class ComplianceQueryRequest(BaseModel):
     code_snippet: Optional[str] = Field(
         None, description="Code or requirement text to validate"
     )
-    standard: str = Field("DO-178B", description="Technical standard to query against")
+    standard: str = Field("MISRA C:2023", description="Technical standard to query against")
 
     model_config = {
         "json_schema_extra": {
             "example": {
-                "query": "Does this function violate any MISRA-C 2023 rules?",
+                "query": "Does this function violate any MISRA C:2023 rules?",
                 "code_snippet": "def calculate_altitude(pressure: float) -> float:\n    return 44330 * (1 - (pressure / 1013.25) ** 0.1903)",
-                "standard": "MISRA-C 2023",
+                "standard": "MISRA C:2023",
             }
         }
     }

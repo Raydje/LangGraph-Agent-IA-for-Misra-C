@@ -1,7 +1,7 @@
 # Project: Multi-Agent Compliance Validator
 
 ## Goal
-Production-quality multi-agent system that parses technical standards (DO-178B, MISRA-C 2023) and validates code or requirements against them. GitHub CV portfolio project.
+Production-quality multi-agent system that parses technical standards (MISRA C:2023) and validates C code against them. GitHub CV portfolio project.
 
 **Constraints:** Free or minimal-cost services only.
 
@@ -12,9 +12,9 @@ Production-quality multi-agent system that parses technical standards (DO-178B, 
 | Layer | Technology |
 |---|---|
 | API | FastAPI + Uvicorn |
-| LLM | Google Gemini 2.0 Flash (`langchain-google-genai`) |
+| LLM | Google Gemini 2.5 Flash (`langchain-google-genai`) |
 | Embeddings | `gemini-embedding-001` (768 dims) |
-| Vector DB | Pinecone (free tier) |
+| Vector DB | Pinecone (free tier, serverless, cosine, auto-created if absent) |
 | Document DB | MongoDB Atlas M0 (free) via Motor (async) |
 | Agent framework | LangGraph + LangChain Core |
 | Config | Pydantic Settings (`python-dotenv`) |
@@ -27,22 +27,23 @@ Production-quality multi-agent system that parses technical standards (DO-178B, 
 ```
 POST /api/v1/query
   └── LangGraph (graph/builder.py)
-        ├── orchestrator_node   temp=0.0  → classifies intent: search | validate | explain
+        ├── orchestrator_node   temp=0.0  → structured output (OrchestratorOutput Pydantic schema)
+        │                                    classifies intent: search | validate | explain
         │                                    overrides to "validate" if code_snippet present
-        ├── rag_node                       → hybrid retrieval
+        ├── rag_node                       → hybrid retrieval (MISRA C:2023 only)
         │     ├── sparse: MongoDB regex match on rule IDs in query text
-        │     └── dense:  Pinecone top_k=5 semantic search → fetch ground truth from MongoDB
+        │     └── dense:  Pinecone top_k=5 → fetch full rules via get_misra_rules_by_pinecone_ids()
         ├── [validate path only]
         │     ├── validation_node  temp=0.1 → structured JSON verdict with cited rules
         │     └── critique_node    temp=0.0 → 5-criteria hallucination review, loops back if rejected
-        └── assemble_node                  → formats final_response by intent
+        └── assemble_node                  → formats final_response by intent (defined inline in builder.py)
 ```
 
 ### Graph Routing (`graph/edges.py`)
 - `route_after_rag`: `"validate"` → `validation_node`, else → `assemble_node`
-- `should_loop_or_finish`: `critique_approved=True` or `iteration_count >= max_iterations` → `assemble_node`, else → `validation_node`
+- `should_loop_or_finish`: `critique_approved=True` → `assemble_node`; `iteration_count < max_iterations` → `validation_node`; else → `assemble_node`
 
-**Loop cap:** `max_iterations=3` (set in route handler initial state).
+**Loop cap:** `max_iterations` is read from `settings.max_critique_iterations` (default `4`) and set in the route handler initial state.
 
 ---
 
@@ -50,28 +51,29 @@ POST /api/v1/query
 
 | Path | Role |
 |---|---|
-| `main.py` | FastAPI app factory, mounts router, startup logging |
-| `app/config.py` | `get_settings()` — cached Pydantic Settings loader |
-| `app/utils.py` | `parse_json_response()` — strips LLM markdown fences before JSON parsing |
-| `app/api/routes.py` | Route handlers: `GET /health`, `POST /query`, `GET /rules`, `POST /seed` |
-| `app/api/dependencies.py` | `get_compiled_graph()` — cached compiled LangGraph instance |
-| `app/graph/builder.py` | `build_graph()` — StateGraph wiring + `assemble_node` defined inline |
+| `main.py` | FastAPI app factory, mounts router at `/api/v1`, startup logging, root `/` redirects to `/docs` |
+| `app/config.py` | `get_settings()` — `lru_cache`-wrapped Pydantic Settings; includes `max_critique_iterations=4`, `confidence_threshold=0.85` |
+| `app/utils.py` | `parse_json_response()` — strips LLM markdown fences before `json.loads()` |
+| `app/api/routes.py` | Route handlers: `GET /health`, `POST /query`, `POST /seed` |
+| `app/api/dependencies.py` | `get_compiled_graph()` — `lru_cache`-wrapped compiled LangGraph instance |
+| `app/graph/builder.py` | `build_graph()` — StateGraph wiring + `assemble_node` (inline) |
 | `app/graph/edges.py` | `route_after_rag`, `should_loop_or_finish` — conditional edge functions |
-| `app/graph/nodes/orchestrator.py` | Intent classification node |
-| `app/graph/nodes/rag.py` | Hybrid retrieval node (Pinecone + MongoDB) |
-| `app/graph/nodes/validation.py` | DO-178B compliance checker node |
-| `app/graph/nodes/critique.py` | Hallucination reviewer node |
-| `app/models/state.py` | `ComplianceState` TypedDict — shared graph state |
-| `app/models/requests.py` | `ComplianceQueryRequest`, `IngestRuleRequest` |
-| `app/models/responses.py` | `ComplianceQueryResponse`, `HealthResponse`, `IngestResponse` |
-| `app/services/llm_service.py` | `get_llm(temperature)` — Gemini client factory |
-| `app/services/embedding_service.py` | `get_embedding(text)` → 768-dim vector |
-| `app/services/pinecone_service.py` | `query_pinecone(vector, top_k)`, `upsert_vectors()` |
-| `app/services/mongodb_service.py` | `get_rules_by_ids()`, `get_rules_by_metadata()`, `upsert_rule()` |
-| `app/data/seed_rules.py` | 10 static DO-178B bootstrap rules |
-| `app/data/ingest.py` | Embeds rules → upserts to Pinecone + MongoDB |
-| `data/misra_c_2023__headlines_for_cppcheck.txt` | Raw MISRA-C 2023 rule headlines |
-| `architecture-app.md` | Living design document |
+| `app/graph/nodes/orchestrator.py` | Intent classification via `get_structured_llm(OrchestratorOutput)`; hardcodes `standard="MISRA C:2023"` in output |
+| `app/graph/nodes/rag.py` | Hybrid retrieval; returns `retrieved_rules`, `rag_query_used`, `metadata_filters_applied`; filters by `{"scope": "MISRA C:2023"}` |
+| `app/graph/nodes/validation.py` | MISRA C:2023 compliance checker; synchronous; increments `iteration_count`; handles critique feedback on re-runs |
+| `app/graph/nodes/critique.py` | 5-criteria hallucination reviewer; synchronous; returns `critique_approved`, `critique_feedback` |
+| `app/models/state.py` | `ComplianceState` TypedDict, `RetrievedRule` TypedDict, `CritiqueEntry` TypedDict |
+| `app/models/requests.py` | `ComplianceQueryRequest` (default `standard="MISRA C:2023"`), `IngestRuleRequest` |
+| `app/models/responses.py` | `ComplianceQueryResponse`, `HealthResponse`, `IngestResponse`, `CritiqueDetail` |
+| `app/services/llm_service.py` | `get_llm(temperature)`, `get_structured_llm(schema, temperature)` — no singleton caching, new instance per call |
+| `app/services/embedding_service.py` | Module-level singleton; `get_embedding(text)` → 768-dim vector; `embed_and_store(rules)` builds Pinecone vectors with ID `MISRA_{section}.{rule_number}` |
+| `app/services/pinecone_service.py` | Module-level singleton; `query_pinecone(vector, top_k, filter)`, `upsert_vectors(vectors)` (batches of 100); auto-creates index on first use |
+| `app/services/mongodb_service.py` | `get_misra_rules_by_pinecone_ids(rule_ids)` (primary), `get_rules_by_ids()`, `get_rules_by_metadata(filters)`, `insert_rules()`, `create_indexes()` |
+| `app/data/seed_rules.py` | 10 static DO-178B rules (legacy, not used by current MISRA pipeline) |
+| `app/data/ingest.py` | `parse_misra_file()` → `upload_to_mongodb()` → Pinecone embedding; called by `POST /seed` |
+| `data/misra_c_2023__headlines_for_cppcheck.txt` | Raw MISRA C:2023 rule headlines (source of truth for ingestion) |
+| `architecture-app.md` | Intended directory tree (reference only; some test files listed are not yet created) |
+| `tests/unit/graph/nodes/test_rag.py` | Only existing test file |
 
 ---
 
@@ -81,7 +83,7 @@ POST /api/v1/query
 # Input
 query: str
 code_snippet: str
-standard: str                          # e.g. "DO-178B", "MISRA-C"
+standard: str                          # hardcoded to "MISRA C:2023" by orchestrator_node
 
 # Orchestrator output
 intent: Literal["search", "validate", "explain"]
@@ -103,14 +105,12 @@ critique_feedback: str
 critique_approved: bool
 iteration_count: int
 max_iterations: int
-critique_history: Annotated[list[CritiqueEntry], operator.add]  # append-only
+critique_history: Annotated[list[CritiqueEntry], operator.add]  # append-only (never written to currently)
 
 # Final
 final_response: str
 error: str
 ```
-
-> **Note (Misra-C_Compliance branch):** `rag_node` currently returns `{"documents": ..., "context": ...}` — keys not in `ComplianceState`. This state schema drift is the active in-progress work: aligning the MISRA-C RAG output to populate `retrieved_rules`.
 
 ---
 
@@ -120,15 +120,14 @@ error: str
 |---|---|---|
 | `GET` | `/api/v1/health` | Pings MongoDB and Pinecone; returns `status: healthy\|degraded` |
 | `POST` | `/api/v1/query` | Main inference endpoint — runs the full LangGraph pipeline |
-| `GET` | `/api/v1/rules` | Lists rules from MongoDB filtered by `standard` and optional `dal_level` |
-| `POST` | `/api/v1/seed` | Ingests the 10 static DO-178B seed rules into Pinecone + MongoDB |
+| `POST` | `/api/v1/seed` | Parses `data/misra_c_2023__headlines_for_cppcheck.txt` → ingests into MongoDB + Pinecone |
 
 ### `/query` request shape
 ```json
 {
   "query": "Does this code handle memory allocation safely?",
   "code_snippet": "char *p = malloc(n);",
-  "standard": "MISRA-C"
+  "standard": "MISRA C:2023"
 }
 ```
 
@@ -136,30 +135,50 @@ error: str
 
 ## Environment Variables (`.env`)
 
+Only three variables need to be set manually; all others fall back to `Settings` defaults:
+
 ```
+# Required
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.0-flash
-GEMINI_EMBEDDING_MODEL=gemini-embedding-001
 PINECONE_API_KEY=
-PINECONE_INDEX_NAME=
+MONGODB_URI=
+
+# Optional (defaults shown)
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+PINECONE_INDEX_NAME=compliance-rules
 PINECONE_CLOUD=aws
 PINECONE_REGION=us-east-1
-MONGODB_URI=
-MONGODB_DB=
-MONGODB_COLLECTION=
+MONGODB_DATABASE=compliance_db
+MONGODB_COLLECTION=rules
 ```
+
+> **Note:** `.env` must NOT be committed. Add it to `.gitignore`. Create a `.env.example` with empty values as a reference.
 
 ---
 
 ## Development Conventions
 
-- **Async everywhere:** all service calls and route handlers must be `async`.
-- **Structured LLM output:** always use `parse_json_response()` from `app/utils.py` to strip markdown fences before `json.loads()`.
-- **Service singletons:** use module-level getters (`get_llm()`, `get_embedding()`, `_get_db()`, `_get_index()`). Never instantiate services inside node functions.
+- **Async everywhere:** all service calls and route handlers must be `async`. Exception: `validation_node` and `critique_node` are currently synchronous.
+- **Structured LLM output:** use `get_structured_llm(schema)` for Pydantic-validated output (orchestrator). Use `parse_json_response()` + `json.loads()` for freeform JSON from other nodes.
+- **Service singletons:** module-level getters (`_get_db()`, `_get_index()`, `_service_instance`). Never instantiate services inside node functions. Exception: `get_llm()` creates a new instance each call.
 - **Pydantic for I/O:** request/response schemas in `app/models/requests.py` and `app/models/responses.py` only.
 - **One node per file** under `app/graph/nodes/`. `assemble_node` is an exception — defined inline in `builder.py`.
-- **State keys must match `ComplianceState`:** returning unknown keys from a node is silently ignored by LangGraph; always verify against the TypedDict.
+- **State keys must match `ComplianceState`:** nodes returning unknown keys are silently ignored by LangGraph.
+- **MISRA ID format:** Pinecone vector IDs use `MISRA_{section}.{rule_number}`. MongoDB stores `section` (int) and `rule_number` (int) as separate fields with a compound unique index.
 - **Keep costs free:** Gemini free tier, Pinecone free tier (1 index), MongoDB Atlas M0.
+
+---
+
+## Known Gaps / Open Issues
+
+| Issue | Location | Detail |
+|---|---|---|
+| `Dir X.Y` directives skipped | `app/data/ingest.py` | Regex only matches `Rule X.Y`; all MISRA Directives are silently dropped during ingestion |
+| `critique_history` never written | `critique.py`, `validation.py` | `ComplianceState` field and `ComplianceQueryResponse.critique_history` exist but no node populates them |
+| `GET /rules` endpoint missing | `app/api/routes.py` | Listed in early docs, never implemented |
+| Test suite incomplete | `tests/unit/` | Only `test_rag.py` exists; `pytest`/`pytest-asyncio` absent from `requirements.txt`; `test_rag.py` patches the wrong MongoDB function |
+| `IngestRuleRequest.dal_level` | `app/models/requests.py` | DO-178B-specific field (`pattern="^[A-E]$"`); unused by current MISRA ingestion |
 
 ---
 
@@ -169,7 +188,7 @@ MONGODB_COLLECTION=
 uvicorn main:app --reload
 ```
 
-Seed the knowledge base (first run only):
+Seed the knowledge base (run once after first setup):
 ```bash
 curl -X POST http://localhost:8000/api/v1/seed
 ```
@@ -178,13 +197,3 @@ Health check:
 ```bash
 curl http://localhost:8000/api/v1/health
 ```
-
----
-
-## Current Active Branch
-`Misra-C_Compliance` — integrating MISRA-C 2023 rule ingestion and validation.
-
-**In progress:**
-- Align `rag_node` output keys (`documents`, `context`) → `retrieved_rules` to match `ComplianceState`
-- Ingest MISRA-C 2023 rules from `data/misra_c_2023__headlines_for_cppcheck.txt` into Pinecone + MongoDB
-- Update `validation_node` prompt to handle MISRA-C rule format (section.rule_number, category) alongside DO-178B

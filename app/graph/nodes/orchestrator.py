@@ -17,7 +17,7 @@ class OrchestratorOutput(BaseModel):
 def orchestrate(state: ComplianceState) -> dict:
     """
     Analyzes the user's query and code snippet to determine the workflow intent.
-    Currently focused entirely on MISRA-C compliance.
+    Currently focused entirely on MISRA C:2023 compliance.
     Updates the state with 'intent' and 'orchestrator_reasoning'.
     """
     query = state.get("query", "")
@@ -26,16 +26,16 @@ def orchestrate(state: ComplianceState) -> dict:
     # Initialize the structured LLM (temperature=0.0 for deterministic classification)
     llm = get_structured_llm(OrchestratorOutput, temperature=0.0)
     
-    # Create the prompt instructing the LLM on how to classify for MISRA-C
+    # Create the prompt instructing the LLM on how to classify for MISRA C:2023
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are the intelligent routing orchestrator for a C/C++ static analysis AI agent.
-        Your job is to analyze the user's request regarding the MISRA-C standard and classify it into one of three intents:
+        Your job is to analyze the user's request regarding the MISRA C:2023 standard and classify it into one of three intents:
         
-        1. "search": The user is looking for specific MISRA-C rules, guidelines, or documentation. 
+        1. "search": The user is looking for specific MISRA C:2023 rules, guidelines, or documentation. 
            (e.g., "Find rules about dead code", "What does MISRA say about pointer arithmetic?")
-        2. "validate": The user has provided C/C++ code and wants to check if it complies with MISRA-C rules.
-           (e.g., "Check this C code snippet against MISRA-C:2012", "Does this function violate any MISRA directives?")
-        3. "explain": The user wants a detailed, conceptual explanation of a specific MISRA-C rule or why a practice is banned.
+        2. "validate": The user has provided C/C++ code and wants to check if it complies with MISRA C:2023 rules.
+           (e.g., "Check this C code snippet against MISRA C:2023", "Does this function violate any MISRA directives?")
+        3. "explain": The user wants a detailed, conceptual explanation of a specific MISRA C:2023 rule or why a practice is banned.
            (e.g., "Explain why recursion is banned in MISRA", "What is the rationale behind rule 11.4?")
            
         Analyze the inputs carefully and output the intent and your reasoning.
@@ -56,5 +56,5 @@ def orchestrate(state: ComplianceState) -> dict:
     return {
         "intent": result.intent,
         "orchestrator_reasoning": result.reasoning,
-        "standard": "MISRA-C" # Explicitly setting the standard in the state
+        "standard": "MISRA C:2023" # Explicitly setting the standard in the state
     }
