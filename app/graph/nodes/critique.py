@@ -2,7 +2,7 @@ import json
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState, CritiqueEntry
 from app.services.llm_service import get_llm
-from app.utils import parse_json_response, calculate_gemini_cost
+from app.utils import parse_json_response, calculate_gemini_cost, logger
 
 
 def critique_node(state: ComplianceState) -> dict:
@@ -10,7 +10,7 @@ def critique_node(state: ComplianceState) -> dict:
     Meta-reviewer that detects hallucinations or logical flaws in the validation result.
     Evaluates the output against 5 strict criteria specific to MISRA C:2023.
     """
-    print("--- NODE: CRITIQUE ---")
+    logger.info("--- NODE: CRITIQUE ---")
 
     llm = get_llm(temperature=0.0)
 
@@ -21,6 +21,7 @@ def critique_node(state: ComplianceState) -> dict:
     is_compliant = state.get("is_compliant", False)
 
     actual_retrieved_rule_ids = [r["rule_id"] for r in rules]
+    logger.info("Critique_node", validation_result=validation_result, cited_rules=cited_rules, is_compliant=is_compliant)
 
     system_prompt = """You are a Senior Quality Assurance Reviewer for MISRA C:2023 compliance.
 Your job is to review the validation report produced by a junior AI agent and determine if it is accurate, logical, and free of hallucinations.
@@ -74,7 +75,7 @@ Based on the 5 criteria, generate your JSON verdict."""
             "approved": approved,
         }
     except (json.JSONDecodeError, ValueError):
-        print("Critique node failed to parse JSON.")
+        logger.error("Critique node failed to parse JSON.")
         approved = False
         feedback = "Critique system failed to output valid JSON. Please simplify your validation output."
         critique_entry : CritiqueEntry = {
@@ -86,6 +87,8 @@ Based on the 5 criteria, generate your JSON verdict."""
     critique_usage = response.usage_metadata if hasattr(response, "usage_metadata") else {}
     _input_tokens = critique_usage.get("input_tokens", 0)
     _output_tokens = critique_usage.get("output_tokens", 0)
+    logger.info("Critique_node_result", approved=approved, feedback=feedback, input_tokens=_input_tokens, output_tokens=_output_tokens)
+    logger.info("Critique_node_cost", estimated_cost=calculate_gemini_cost(_input_tokens, _output_tokens))
     
     return {
         "critique_approved": approved,

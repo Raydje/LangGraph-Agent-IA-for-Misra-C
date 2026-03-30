@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from app.models.state import ComplianceState
 from app.services.llm_service import get_llm
-from app.utils import calculate_gemini_cost
+from app.utils import calculate_gemini_cost, logger
 
 # 1. Define the desired structured output schema
 class OrchestratorOutput(BaseModel):
@@ -23,7 +23,7 @@ def orchestrate(state: ComplianceState) -> dict:
     """
     query = state.get("query", "")
     code_snippet = state.get("code_snippet", "")
-    
+    logger.info("Orchestrator_node", query=query, code_snippet=code_snippet)
     # Initialize the base LLM (temperature=0.0 for deterministic classification)
     llm = get_llm(temperature=0.0)
     
@@ -59,7 +59,9 @@ def orchestrate(state: ComplianceState) -> dict:
     usage = raw_result["raw"].usage_metadata or {}
     _input_tokens = usage.get("input_tokens", 0)
     _output_tokens = usage.get("output_tokens", 0)
-
+    logger.info("Orchestrator_node_result", intent=result.intent, reasoning=result.reasoning, input_tokens=_input_tokens, output_tokens=_output_tokens)
+    logger.info("Orchestrator_node_cost", estimated_cost=calculate_gemini_cost(_input_tokens, _output_tokens))
+    
     # LangGraph nodes must return a dictionary containing the keys of the State to update
     return {
         "intent": result.intent,

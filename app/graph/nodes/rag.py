@@ -5,6 +5,7 @@ from app.models.state import ComplianceState, RetrievedRule
 from app.services.embedding_service import get_embedding
 from app.services.pinecone_service import query_pinecone
 from app.services.mongodb_service import get_misra_rules_by_pinecone_ids
+from app.utils import logger
 
 async def rag_node(state: ComplianceState) -> dict[str, Any]:
     """
@@ -12,11 +13,12 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
     Currently focused strictly on fetching MISRA C:2023 rules using Pinecone (vector search)
     and MongoDB (document retrieval).
     """
+    logger.info("RAG_node invoked", query=state.get("query", ""))
     query = state.get("query", "")
     
     # 1. Embed the user's query
     vector = await get_embedding(query)
-
+    logger.info("RAG_node - query embedded")
     # 2. Build metadata filters strictly for MISRA C:2023
     # Based on your ingest script, we lock the scope to MISRA C:2023 
     # so we don't accidentally retrieve any other standards later.
@@ -40,7 +42,7 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
     if rule_ids:
         # 4. Fetch the full MISRA C:2023 documents from MongoDB
         mongo_docs = await get_misra_rules_by_pinecone_ids(rule_ids)
-
+        logger.info(f"RAG_node - retrieved {len(mongo_docs)} documents from MongoDB based on Pinecone IDs")
         # 5. Format the documents into the TypedDict expected by LangGraph
         for doc in mongo_docs:
             r_id = doc.get("rule_id", "")
@@ -58,7 +60,7 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
 
         # Ensure the final list is sorted by relevance score descending 
         retrieved_rules.sort(key=lambda x: x["relevance_score"], reverse=True)
-
+    logger.info(f"RAG_node - formatted {len(retrieved_rules)} retrieved rules for state update")
     # 6. Return the state update dictionary.
     return {
         "retrieved_rules": retrieved_rules,

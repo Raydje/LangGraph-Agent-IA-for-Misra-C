@@ -17,6 +17,7 @@ from app.data.seed_rules import SEED_RULES
 from app.services.pinecone_service import upsert_vectors
 from app.services.embedding_service import EmbeddingService
 from app.services.mongodb_service import insert_rules, create_indexes, get_rules_collection
+from app.utils import logger
 
 
 def parse_misra_file(filepath: str) -> list[dict]:
@@ -30,13 +31,13 @@ def parse_misra_file(filepath: str) -> list[dict]:
     base_dir = Path(__file__).resolve().parent.parent.parent
     file_path = base_dir / filepath
     
-    print(f"📂 Attempting to read file: {file_path}")
+    logger.info(f"📂 Attempting to read file: {file_path}")
 
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
     except FileNotFoundError:
-        print(f"Error: Could not find {file_path}")
+        logger.error(f"Error: Could not find {file_path}")
         return []
 
     current_rule = None
@@ -89,14 +90,14 @@ def parse_misra_file(filepath: str) -> list[dict]:
 async def upload_to_mongodb(rules: list[dict]):
     """Uploads parsed rules to MongoDB asynchronously."""
     if not rules:
-        print("No rules to upload.")
+        logger.warning("No rules to upload.")
         return
 
-    print("Connecting to MongoDB Atlas...")
+    logger.info("Connecting to MongoDB Atlas...")
     collection = await get_rules_collection()
     await create_indexes()
 
-    print(f"Preparing to insert/update {len(rules)} rules...")
+    logger.info(f"Preparing to insert/update {len(rules)} rules...")
 
     operations = []
     for rule in rules:
@@ -105,9 +106,9 @@ async def upload_to_mongodb(rules: list[dict]):
 
     if operations:
         result = await collection.bulk_write(operations)
-        print(f"✅ Successfully processed {len(rules)} rules in MongoDB!")
-        print(f"   - Inserted: {result.upserted_count}")
-        print(f"   - Modified: {result.modified_count}")
+        logger.info(f"✅ Successfully processed {len(rules)} rules in MongoDB!")
+        logger.info(f"   - Inserted: {result.upserted_count}")
+        logger.info(f"   - Modified: {result.modified_count}")
 
 async def main() -> dict:
     # Test the parser
@@ -115,19 +116,19 @@ async def main() -> dict:
     parsed_rules = parse_misra_file(target_file)
 
     if parsed_rules:
-        print(f"✅ Successfully parsed {len(parsed_rules)} rules!\n")
-        print("Sample of the first parsed rule:")
-        print(json.dumps(parsed_rules[0], indent=2))
+        logger.info(f"✅ Successfully parsed {len(parsed_rules)} rules!\n")
+        logger.info("Sample of the first parsed rule:")
+        logger.info(json.dumps(parsed_rules[0], indent=2))
 
         # You can also verify the last rule to ensure the loop finished correctly
-        print("\nSample of the last parsed rule:")
-        print(json.dumps(parsed_rules[-1], indent=2))
+        logger.info("\nSample of the last parsed rule:")
+        logger.info(json.dumps(parsed_rules[-1], indent=2))
 
         # Now upload to MongoDB
-        print("2. Uploading to MongoDB...")
+        logger.info("2. Uploading to MongoDB...")
         await upload_to_mongodb(parsed_rules)
 
-        print("3. Uploading to Pinecone...")
+        logger.info("3. Uploading to Pinecone...")
         embedder = EmbeddingService()
         # Add 'await' here!
         vectors_upserted = await embedder.embed_and_store(parsed_rules)

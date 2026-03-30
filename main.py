@@ -3,16 +3,17 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.api.routes import router
 from app.config import get_settings
+from app.utils import logger
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Logs configuration on startup to ensure environment variables are loaded."""
     settings = get_settings()
-    print(f"[Startup] Loaded config for standard: MISRA C:2023")
-    print(f"[Startup] Gemini model: {settings.gemini_model}")
-    print(f"[Startup] MongoDB: {settings.mongodb_uri}/{settings.mongodb_database}")
-    print(f"[Startup] Pinecone index: {settings.pinecone_index_name}")
+    logger.info(f"[Startup] Loaded config for standard: MISRA C:2023")
+    logger.info(f"[Startup] Gemini model: {settings.gemini_model}")
+    logger.info(f"[Startup] MongoDB: {settings.mongodb_uri}/{settings.mongodb_database}")
+    logger.info(f"[Startup] Pinecone index: {settings.pinecone_index_name}")
     yield
 
 

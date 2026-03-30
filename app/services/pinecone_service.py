@@ -1,5 +1,6 @@
 from pinecone import Pinecone, ServerlessSpec
 from app.config import get_settings
+from app.utils import logger
 
 _index = None
 
@@ -38,7 +39,7 @@ async def query_pinecone(
         filter=filter,
         include_metadata=True,
     )
-    print(f"Pinecone query returned {len(results.matches)} matches.")
+    logger.info(f"Pinecone query returned {len(results.matches)} matches.")
     return {
         "matches": [
             {
@@ -58,5 +59,6 @@ async def upsert_vectors(vectors: list[dict]) -> int:
     for i in range(0, len(vectors), batch_size):
         batch = vectors[i : i + batch_size]
         index.upsert(vectors=batch)
+        logger.info(f"✅ Successfully upserted {len(batch)} vectors to Pinecone!")
         total += len(batch)
     return total

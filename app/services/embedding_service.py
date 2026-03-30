@@ -2,6 +2,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from app.config import get_settings
 from app.services.pinecone_service import upsert_vectors
+from app.utils import logger
 
 _service_instance = None
 
@@ -30,13 +31,13 @@ class EmbeddingService:
         if not rules:
             return 0
 
-        print(f"Generating embeddings for {len(rules)} rules...")
+        logger.info(f"Generating embeddings for {len(rules)} rules...")
         
         texts = [rule["full_text"] for rule in rules]
 
         all_embeddings = self.embeddings.embed_documents(texts)
 
-        print("Packaging vectors...")
+        logger.info("Packaging vectors...")
         
         vectors = []
         for rule, embedding_vector in zip(rules, all_embeddings):
@@ -56,7 +57,7 @@ class EmbeddingService:
                 "metadata": metadata
             })
 
-        print("Delegating upload to pinecone_service...")
+        logger.info("Delegating upload to pinecone_service...")
         upserted = await upsert_vectors(vectors)
-        print(f"✅ Successfully passed {len(vectors)} embeddings to Pinecone!")
+        logger.info(f"✅ Successfully passed {len(vectors)} embeddings to Pinecone!")
         return upserted

@@ -1,4 +1,3 @@
-import logging
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.state import CompiledStateGraph
 from app.models.state import ComplianceState
@@ -12,7 +11,8 @@ from app.graph.nodes.critique import critique_node
 # Import your routing edges
 from app.graph.edges import route_after_rag, should_loop_or_finish
 
-logger = logging.getLogger(__name__)
+# Import utilities
+from app.utils import logger
 
 
 def assemble_node(state: ComplianceState) -> dict:

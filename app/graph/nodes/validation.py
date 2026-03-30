@@ -2,7 +2,7 @@ import json
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState
 from app.services.llm_service import get_llm
-from app.utils import parse_json_response, calculate_gemini_cost
+from app.utils import parse_json_response, calculate_gemini_cost, logger
 
 
 def validation_node(state: ComplianceState) -> dict:
@@ -10,7 +10,7 @@ def validation_node(state: ComplianceState) -> dict:
     Evaluates the provided code snippet against the retrieved MISRA C:2023 rules.
     Takes critique feedback into account if this is a subsequent iteration.
     """
-    print("--- NODE: VALIDATION ---")
+    logger.info("--- NODE: VALIDATION ---")
 
     llm = get_llm(temperature=0.1)
 
@@ -19,7 +19,8 @@ def validation_node(state: ComplianceState) -> dict:
     rules = state.get("retrieved_rules", [])
     critique_feedback = state.get("critique_feedback", "")
     iteration = state.get("iteration_count", 0)
-
+    logger.info("Validation_node", query=query, code_snippet=code, iteration=iteration)
+    
     # Format retrieved rules — MISRA C:2023 IDs are either "Dir X.Y" or "Rule X.Y"
     rules_context = "\n\n".join(
         [f"Rule ID: {r['rule_id']}\nCategory: {r.get('dal_level', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"
@@ -92,6 +93,8 @@ Respond with the JSON verdict only."""
     validation_usage = response.usage_metadata if hasattr(response, "usage_metadata") else {}
     _input_tokens = validation_usage.get("input_tokens", 0)
     _output_tokens = validation_usage.get("output_tokens", 0)
+    logger.info("Validation_node_result", validation_result=result.get("validation_result", ""), is_compliant=result.get("is_compliant", False), confidence_score=result.get("confidence_score", 0.0), cited_rules=result.get("cited_rules", []), input_tokens=_input_tokens, output_tokens=_output_tokens)
+    logger.info("Validation_node_cost", estimated_cost=calculate_gemini_cost(_input_tokens, _output_tokens))
     return {
         "validation_result": result.get("validation_result", ""),
         "is_compliant": result.get("is_compliant", False),
