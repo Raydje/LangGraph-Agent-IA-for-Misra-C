@@ -87,11 +87,18 @@ Respond with the JSON verdict only."""
             "cited_rules": [],
             "iteration_count": iteration + 1,
         }
-
+    # Track validation tokens used
+    validation_usage = response.usage_metadata if hasattr(response, "usage_metadata") else {}
+    _input_tokens = validation_usage.get("input_tokens", 0)
+    _output_tokens = validation_usage.get("output_tokens", 0)
     return {
         "validation_result": result.get("validation_result", ""),
         "is_compliant": result.get("is_compliant", False),
         "confidence_score": result.get("confidence_score", 0.0),
         "cited_rules": result.get("cited_rules", []),
         "iteration_count": iteration + 1,
+        "prompt_tokens": _input_tokens,
+        "completion_tokens": _output_tokens,
+        "total_tokens": _input_tokens + _output_tokens,
+        "validation_tokens": _input_tokens + _output_tokens,
     }

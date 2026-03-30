@@ -4,6 +4,7 @@ from app.models.responses import (
     ComplianceQueryResponse,
     HealthResponse,
     IngestResponse,
+    MetadataUsage,  
 )
 from app.api.dependencies import get_compiled_graph, get_mongo_db, get_pinecone_index
 from app.config import get_settings
@@ -77,6 +78,15 @@ async def query_compliance(
         critique_history=result.get("critique_history", []),
         retrieved_rule_ids=[r.get("rule_id", "") for r in result.get("retrieved_rules", [])],
         error=result.get("error"),
+        # Metadata
+        total_tokens_usage=MetadataUsage(
+            prompt_tokens=result.get("prompt_tokens", 0),
+            completion_tokens=result.get("completion_tokens", 0),
+            total_tokens=result.get("total_tokens", 0),
+            orchestrator_tokens=result.get("orchestrator_tokens", 0),
+            validation_tokens=result.get("validation_tokens", 0),
+            critique_tokens=result.get("critique_tokens", 0),
+        ),
     )
 
 @router.post("/seed", response_model=IngestResponse)

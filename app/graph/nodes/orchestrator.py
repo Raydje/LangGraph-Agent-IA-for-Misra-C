@@ -2,7 +2,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from app.models.state import ComplianceState
-from app.services.llm_service import get_structured_llm
+from app.services.llm_service import get_llm
 
 # 1. Define the desired structured output schema
 class OrchestratorOutput(BaseModel):
@@ -23,8 +23,8 @@ def orchestrate(state: ComplianceState) -> dict:
     query = state.get("query", "")
     code_snippet = state.get("code_snippet", "")
     
-    # Initialize the structured LLM (temperature=0.0 for deterministic classification)
-    llm = get_structured_llm(OrchestratorOutput, temperature=0.0)
+    # Initialize the base LLM (temperature=0.0 for deterministic classification)
+    llm = get_llm(temperature=0.0)
     
     # Create the prompt instructing the LLM on how to classify for MISRA C:2023
     prompt = ChatPromptTemplate.from_messages([
@@ -44,17 +44,28 @@ def orchestrate(state: ComplianceState) -> dict:
     ])
     
     # Chain the prompt and the structured LLM together
-    chain = prompt | llm
-    
+    # include_raw=True returns {"raw": AIMessage, "parsed": OrchestratorOutput, "parsing_error": ...}
+    chain = prompt | llm.with_structured_output(OrchestratorOutput, include_raw=True)
+
     # Invoke the chain with the current state data
-    result: OrchestratorOutput = chain.invoke({
+    raw_result = chain.invoke({
         "query": query,
         "code": code_snippet if code_snippet else "None provided."
     })
-    
+    result: OrchestratorOutput = raw_result["parsed"]
+
+    # Extract token usage from the raw AIMessage (usage_metadata uses input_tokens/output_tokens)
+    usage = raw_result["raw"].usage_metadata or {}
+    _input_tokens = usage.get("input_tokens", 0)
+    _output_tokens = usage.get("output_tokens", 0)
+
     # LangGraph nodes must return a dictionary containing the keys of the State to update
     return {
         "intent": result.intent,
         "orchestrator_reasoning": result.reasoning,
-        "standard": "MISRA C:2023" # Explicitly setting the standard in the state
+        "standard": state.get("standard", "MISRA C:2023"),
+        "prompt_tokens": _input_tokens,
+        "completion_tokens": _output_tokens,
+        "total_tokens": _input_tokens + _output_tokens,
+        "orchestrator_tokens": _input_tokens + _output_tokens,
     }

@@ -46,6 +46,14 @@ class ComplianceState(TypedDict):
     iteration_count: int
     max_iterations: int
     critique_history: Annotated[list[CritiqueEntry], operator.add]
+    
+    # Metadata
+    prompt_tokens: Annotated[int, operator.add]
+    completion_tokens: Annotated[int, operator.add]
+    total_tokens: Annotated[int, operator.add]
+    orchestrator_tokens: Annotated[int, operator.add]
+    validation_tokens: Annotated[int, operator.add]
+    critique_tokens: Annotated[int, operator.add]
 
     # Output
     final_response: str

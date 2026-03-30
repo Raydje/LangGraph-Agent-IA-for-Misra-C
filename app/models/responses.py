@@ -5,6 +5,15 @@ class CritiqueDetail(BaseModel):
     iteration: int
     issues_found: list[str]
     approved: bool
+    
+class MetadataUsage(BaseModel):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    orchestrator_tokens: Optional[int] = None
+    validation_tokens: Optional[int] = None
+    critique_tokens: Optional[int] = None
+    
 
 class ComplianceQueryResponse(BaseModel):
     intent: str
@@ -17,6 +26,9 @@ class ComplianceQueryResponse(BaseModel):
     critique_history: list[CritiqueDetail] = []
     retrieved_rule_ids: list[str] = []
     error: Optional[str] = None
+    # Metadata
+    total_tokens_usage: MetadataUsage
+    
 
 class HealthResponse(BaseModel):
     status: str

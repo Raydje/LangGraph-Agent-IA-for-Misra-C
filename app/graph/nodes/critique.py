@@ -82,9 +82,17 @@ Based on the 5 criteria, generate your JSON verdict."""
             "issues_found": [feedback],
             "approved": False,
         }
-
+    #Track critique tokens used
+    critique_usage = response.usage_metadata if hasattr(response, "usage_metadata") else {}
+    _input_tokens = critique_usage.get("input_tokens", 0)
+    _output_tokens = critique_usage.get("output_tokens", 0)
+    
     return {
         "critique_approved": approved,
         "critique_feedback": feedback,
         "critique_history": [critique_entry],
+        "prompt_tokens": _input_tokens,
+        "completion_tokens": _output_tokens,
+        "total_tokens": _input_tokens + _output_tokens,
+        "critique_tokens": _input_tokens + _output_tokens,
     }
