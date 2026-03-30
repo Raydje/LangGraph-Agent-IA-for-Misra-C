@@ -86,6 +86,7 @@ async def query_compliance(
             orchestrator_tokens=result.get("orchestrator_tokens", 0),
             validation_tokens=result.get("validation_tokens", 0),
             critique_tokens=result.get("critique_tokens", 0),
+            estimated_cost=result.get("estimated_cost", 0.0),
         ),
     )
 

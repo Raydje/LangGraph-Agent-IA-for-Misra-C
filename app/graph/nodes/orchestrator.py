@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from app.models.state import ComplianceState
 from app.services.llm_service import get_llm
+from app.utils import calculate_gemini_cost
 
 # 1. Define the desired structured output schema
 class OrchestratorOutput(BaseModel):
@@ -68,4 +69,5 @@ def orchestrate(state: ComplianceState) -> dict:
         "completion_tokens": _output_tokens,
         "total_tokens": _input_tokens + _output_tokens,
         "orchestrator_tokens": _input_tokens + _output_tokens,
+        "estimated_cost": calculate_gemini_cost(_input_tokens, _output_tokens),
     }

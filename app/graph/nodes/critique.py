@@ -2,7 +2,7 @@ import json
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState, CritiqueEntry
 from app.services.llm_service import get_llm
-from app.utils import parse_json_response
+from app.utils import parse_json_response, calculate_gemini_cost
 
 
 def critique_node(state: ComplianceState) -> dict:
@@ -95,4 +95,5 @@ Based on the 5 criteria, generate your JSON verdict."""
         "completion_tokens": _output_tokens,
         "total_tokens": _input_tokens + _output_tokens,
         "critique_tokens": _input_tokens + _output_tokens,
+        "estimated_cost": calculate_gemini_cost(_input_tokens, _output_tokens),
     }

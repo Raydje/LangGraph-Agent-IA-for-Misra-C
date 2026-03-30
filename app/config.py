@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from app.models_pricing import models_pricing
 
 
 class Settings(BaseSettings):
@@ -8,7 +9,11 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
     gemini_embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 768
-
+    
+    # Pricing dollar per 1M tokens (Standard Google AI Studio Pay-as-you-go)
+    gemini_2_5_flash_input_cost_per_1m: float = models_pricing[gemini_model][0]
+    gemini_2_5_flash_output_cost_per_1m: float = models_pricing[gemini_model][1]
+    
     # Pinecone
     pinecone_api_key: str
     pinecone_index_name: str = "compliance-rules"

@@ -2,7 +2,7 @@ import json
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState
 from app.services.llm_service import get_llm
-from app.utils import parse_json_response
+from app.utils import parse_json_response, calculate_gemini_cost
 
 
 def validation_node(state: ComplianceState) -> dict:
@@ -46,7 +46,7 @@ Field details:
 - "is_compliant": true only if the code fully satisfies all applicable retrieved rules.
 - "validation_result": detailed explanation of each violation or confirmation of compliance. Reference specific lines when possible.
 - "confidence_score": float between 0.0 and 1.0.
-- "cited_rules": list of MISRA C:2023 rule IDs used in the evaluation (e.g., ["Rule 15.5", "Dir 4.1"]).
+- "cited_rules": list of MISRA C:2023 rule IDs used in the evaluation (e.g., ["Rule MISRA_15.5", "Dir 4.1"]).
 
 Do not include any text outside the JSON block."""
 
@@ -86,6 +86,7 @@ Respond with the JSON verdict only."""
             "confidence_score": 0.0,
             "cited_rules": [],
             "iteration_count": iteration + 1,
+            "estimated_cost": 0.0,
         }
     # Track validation tokens used
     validation_usage = response.usage_metadata if hasattr(response, "usage_metadata") else {}
@@ -101,4 +102,5 @@ Respond with the JSON verdict only."""
         "completion_tokens": _output_tokens,
         "total_tokens": _input_tokens + _output_tokens,
         "validation_tokens": _input_tokens + _output_tokens,
+        "estimated_cost": calculate_gemini_cost(_input_tokens, _output_tokens),
     }

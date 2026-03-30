@@ -54,6 +54,8 @@ class ComplianceState(TypedDict):
     orchestrator_tokens: Annotated[int, operator.add]
     validation_tokens: Annotated[int, operator.add]
     critique_tokens: Annotated[int, operator.add]
+    estimated_cost: Annotated[float, operator.add]
+    
 
     # Output
     final_response: str

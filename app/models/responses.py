@@ -13,6 +13,7 @@ class MetadataUsage(BaseModel):
     orchestrator_tokens: Optional[int] = None
     validation_tokens: Optional[int] = None
     critique_tokens: Optional[int] = None
+    estimated_cost: Optional[float] = None
     
 
 class ComplianceQueryResponse(BaseModel):
