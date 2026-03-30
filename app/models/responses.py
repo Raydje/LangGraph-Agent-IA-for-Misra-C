@@ -4,7 +4,6 @@ from typing import Optional
 class CritiqueDetail(BaseModel):
     iteration: int
     issues_found: list[str]
-    suggestion: str
     approved: bool
 
 class ComplianceQueryResponse(BaseModel):

@@ -1,6 +1,6 @@
 import json
 from langchain_core.messages import SystemMessage, HumanMessage
-from app.models.state import ComplianceState
+from app.models.state import ComplianceState, CritiqueEntry
 from app.services.llm_service import get_llm
 from app.utils import parse_json_response
 
@@ -68,12 +68,23 @@ Based on the 5 criteria, generate your JSON verdict."""
         result = parse_json_response(response.content)
         approved = result.get("approved", False)
         feedback = result.get("feedback", "Failed to parse critique feedback.")
+        critique_entry: CritiqueEntry = {
+            "iteration": state.get("iteration_count", 0),
+            "issues_found": [feedback] if not approved else [],
+            "approved": approved,
+        }
     except (json.JSONDecodeError, ValueError):
         print("Critique node failed to parse JSON.")
         approved = False
         feedback = "Critique system failed to output valid JSON. Please simplify your validation output."
+        critique_entry : CritiqueEntry = {
+            "iteration": state.get("iteration_count", 0) + 1,
+            "issues_found": [feedback],
+            "approved": False,
+        }
 
     return {
         "critique_approved": approved,
         "critique_feedback": feedback,
+        "critique_history": [critique_entry],
     }

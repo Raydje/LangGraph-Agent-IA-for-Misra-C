@@ -1,39 +1,39 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.models.requests import ComplianceQueryRequest
 from app.models.responses import (
     ComplianceQueryResponse,
     HealthResponse,
     IngestResponse,
 )
-from app.api.dependencies import get_compiled_graph
-from app.services.mongodb_service import get_rules_by_metadata
+from app.api.dependencies import get_compiled_graph, get_mongo_db, get_pinecone_index
 from app.config import get_settings
+from app.data.ingest import main as ingest
 
 router = APIRouter()
 settings = get_settings()
 
 @router.get("/health", response_model=HealthResponse)
-async def health_check():
+async def health_check(
+    db=Depends(get_mongo_db),
+    index=Depends(get_pinecone_index),
+):
     """Checks the health of the API and backing databases (MongoDB & Pinecone)."""
-    from app.services.mongodb_service import _get_db
-    from app.services.pinecone_service import _get_index
-
     mongo_ok = False
     pinecone_ok = False
 
-    try:
-        db = _get_db()
-        await db.command("ping")
-        mongo_ok = True
-    except Exception:
-        pass
+    if db is not None:
+        try:
+            await db.command("ping")
+            mongo_ok = True
+        except Exception:
+            pass
 
-    try:
-        index = _get_index()
-        index.describe_index_stats()
-        pinecone_ok = True
-    except Exception:
-        pass
+    if index is not None:
+        try:
+            index.describe_index_stats()
+            pinecone_ok = True
+        except Exception:
+            pass
 
     status = "healthy" if (mongo_ok and pinecone_ok) else "degraded"
     return HealthResponse(
@@ -43,9 +43,11 @@ async def health_check():
     )
 
 @router.post("/query", response_model=ComplianceQueryResponse)
-async def query_compliance(request: ComplianceQueryRequest):
+async def query_compliance(
+    request: ComplianceQueryRequest,
+    graph=Depends(get_compiled_graph),
+):
     """Main endpoint to trigger the LangGraph multi-agent compliance check."""
-    graph = get_compiled_graph()
 
     # Initialize the LangGraph State
     initial_state = {
@@ -80,7 +82,6 @@ async def query_compliance(request: ComplianceQueryRequest):
 @router.post("/seed", response_model=IngestResponse)
 async def seed_database():
     """Endpoint to trigger the ingestion of rules into MongoDB and Pinecone."""
-    from app.data.ingest import main as ingest
     result = await ingest()
     return IngestResponse(
         message="Seed data ingested successfully",

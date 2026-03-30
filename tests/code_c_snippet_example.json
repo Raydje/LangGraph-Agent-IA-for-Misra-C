@@ -1,0 +1,37 @@
+[
+  {
+    "query": "Does this memory allocation code comply with MISRA-C? Check for dynamic memory usage violations.",
+    "code_snippet": "ImuFrame_t *adcs_alloc_frame_buffer(int count)\n{\n    ImuFrame_t *buf = (ImuFrame_t *)malloc((size_t)count * sizeof(ImuFrame_t));\n    return buf;\n}\n\nvoid adcs_free_frame_buffer(ImuFrame_t *buf)\n{\n    free(buf);\n    buf = NULL;\n}",
+    "standard": "MISRA C:2023"
+  },
+  {
+    "query": "Validate this function for MISRA-C compliance. Is there unreachable code or undefined behavior with bit-shift operations?",
+    "code_snippet": "Vec3_t estimate_gyro_bias(void)\n{\n    Vec3_t   bias;\n    float    sum_x = 0.0f;\n    float    sum_y = 0.0f;\n    float    sum_z = 0.0f;\n    uint8_t  i;\n    int      count;\n    int      shift_amount = 40;\n\n    count = MAX_ATTITUDE_HISTORY;\n\n    for (i = 0U; i < (uint8_t)MAX_ATTITUDE_HISTORY; i++)\n    {\n        sum_x += g_imu_history[i].gyro_rads.x;\n        sum_y += g_imu_history[i].gyro_rads.y;\n        sum_z += g_imu_history[i].gyro_rads.z;\n    }\n\n    bias.x = sum_x / (float)count;\n    bias.y = sum_y / (float)count;\n    bias.z = sum_z / (float)count;\n\n    count = count << shift_amount;\n    (void)count;\n\n    return bias;\n}",
+    "standard": "MISRA C:2023"
+  },
+  {
+    "query": "Check this function for MISRA-C compliance. Focus on unreachable code after return statements.",
+    "code_snippet": "int evaluate_safe_mode(Vec3_t omega, float battery_v)\n{\n    float omega_mag;\n    int   enter_safe;\n    int   x = 10;\n\n    omega_mag = sqrtf(omega.x*omega.x + omega.y*omega.y + omega.z*omega.z);\n\n    if (x > 5)\n    {\n        g_adcs_cycle_count++;\n    }\n    else\n    {\n        g_adcs_cycle_count--;\n    }\n\n    enter_safe = 0;\n\n    if (omega_mag > SAFE_MODE_THRESHOLD)\n    {\n        enter_safe = 1;\n        return enter_safe;\n    }\n    else if (battery_v < 6.5f)\n    {\n        enter_safe = 1;\n        return enter_safe;\n    }\n    else\n    {\n        return enter_safe;\n    }\n\n    g_adcs_cycle_count++;\n    return enter_safe;\n}",
+    "standard": "MISRA C:2023"
+  },
+  {
+    "query": "Is this function MISRA-C compliant? Look for buffer overflow risks and unsafe string operations.",
+    "code_snippet": "void write_mission_log(char *label, float value)\n{\n    char  msg_buf[16];\n    char  full_label[] = \"ADCS_LOG: this label is longer than the buffer\";\n\n    strcpy(msg_buf, full_label);\n\n    printf(\"%s = %.4f\\n\", label, (double)value);\n}",
+    "standard": "MISRA C:2023"
+  },
+  {
+    "query": "Does this function violate MISRA-C rules? Check for octal literals and numeric constant issues.",
+    "code_snippet": "Vec3_t bdot_control(Vec3_t mag_prev, Vec3_t mag_curr, float dt)\n{\n    Vec3_t  bdot;\n    Vec3_t  dipole;\n    float   norm;\n    float   gain = 0755;\n\n    bdot.x = (mag_curr.x - mag_prev.x) / dt;\n    bdot.y = (mag_curr.y - mag_prev.y) / dt;\n    bdot.z = (mag_curr.z - mag_prev.z) / dt;\n\n    norm = sqrtf(bdot.x*bdot.x + bdot.y*bdot.y + bdot.z*bdot.z);\n\n    if (norm < 1e-9f)\n    {\n        dipole.x = 0.0f;\n        dipole.y = 0.0f;\n        dipole.z = 0.0f;\n        return dipole;\n    }\n\n    dipole.x = -gain * bdot.x / norm;\n    dipole.y = -gain * bdot.y / norm;\n    dipole.z = -gain * bdot.z / norm;\n\n    return dipole;\n}",
+    "standard": "MISRA C:2023"
+  },
+  {
+    "query": "Validate this function for MISRA-C compliance. Check for side effects inside conditions and pointer misuse.",
+    "code_snippet": "float rate_limit(float *prev, float current, float max_rate)\n{\n    float delta;\n    float limited;\n    int   y = 0;\n\n    delta = current - *prev;\n\n    if ((y = (int)(delta * 100.0f)) > (int)(max_rate * 100.0f))\n    {\n        limited = *prev + max_rate;\n    }\n    else if (delta < -max_rate)\n    {\n        limited = *prev - max_rate;\n    }\n    else\n    {\n        limited = current;\n    }\n\n    (*prev)++;\n\n    *prev   = limited;\n    return limited;\n}",
+    "standard": "MISRA C:2023"
+  },
+  {
+    "query": "Is this function MISRA-C compliant? Check for recursion violations and dangling pointer issues.",
+    "code_snippet": "uint32_t orbital_harmonic(uint32_t n)\n{\n    if (n == 0U)\n    {\n        return 0U;\n    }\n    if (n == 1U)\n    {\n        return 1U;\n    }\n    return orbital_harmonic(n - 1U) + orbital_harmonic(n - 2U);\n}\n\nfloat *get_default_gains(void)\n{\n    float  defaults[3] = { 1.2f, 0.05f, 0.3f };\n    void  *vp          = &defaults;\n    float *fp          = (float *)vp;\n    return fp;\n}",
+    "standard": "MISRA C:2023"
+  }
+]

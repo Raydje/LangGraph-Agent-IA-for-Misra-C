@@ -16,7 +16,6 @@ class RetrievedRule(TypedDict):
 class CritiqueEntry(TypedDict):
     iteration: int
     issues_found: list[str]
-    suggestion: str
     approved: bool
 
 
