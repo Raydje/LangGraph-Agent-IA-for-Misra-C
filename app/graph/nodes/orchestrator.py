@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from app.models.state import ComplianceState
 from app.services.llm_service import get_llm
+from app.config import get_settings
 from app.utils import calculate_gemini_cost, logger
 
 # 1. Define the desired structured output schema
@@ -25,7 +26,8 @@ def orchestrate(state: ComplianceState) -> dict:
     code_snippet = state.get("code_snippet", "")
     logger.info("Orchestrator_node", query=query, code_snippet=code_snippet)
     # Initialize the base LLM (temperature=0.0 for deterministic classification)
-    llm = get_llm(temperature=0.0)
+    settings = get_settings()
+    llm = get_llm(temperature=settings.orchestrator_temperature)
     
     # Create the prompt instructing the LLM on how to classify for MISRA C:2023
     prompt = ChatPromptTemplate.from_messages([

@@ -51,8 +51,8 @@ htmlcov/
 *.log
 logs/
 temps.json
-checkpoints.sqlite
-read_sqlite.py
+checkpoints.sqlite*
+
 
 # IDEs
 .vscode/

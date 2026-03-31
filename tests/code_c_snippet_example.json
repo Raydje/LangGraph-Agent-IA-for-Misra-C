@@ -43,5 +43,10 @@
     "query": "Does this function violate MISRA-C rules? Check for octal literals and numeric constant issues.",
     "code_snippet": "Vec3_t bdot_control(Vec3_t mag_prev, Vec3_t mag_curr, float dt)\n{\n    Vec3_t  bdot;\n    Vec3_t  dipole;\n    float   norm;\n    float   gain = 493.0f;\n\n    bdot.x = (mag_curr.x - mag_prev.x) / dt;\n    bdot.y = (mag_curr.y - mag_prev.y) / dt;\n    bdot.z = (mag_curr.z - mag_prev.z) / dt;\n\n    norm = sqrtf(bdot.x*bdot.x + bdot.y*bdot.y + bdot.z*bdot.z);\n\n    if (norm < 1e-9f)\n    {\n        dipole.x = 0.0f;\n        dipole.y = 0.0f;\n        dipole.z = 0.0f;\n        return dipole;\n    }\n\n    dipole.x = -gain * bdot.x / norm;\n    dipole.y = -gain * bdot.y / norm;\n    dipole.z = -gain * bdot.z / norm;\n\n    return dipole;\n}",
     "standard": "MISRA C:2023"
-  }  
+  },
+  {
+    "query": "Is this function MISRA-C compliant? Look for buffer overflow risks and unsafe string operations.",
+    "code_snippet": "void write_mission_log(char *label, float value)\n{\n    char  msg_buf[16];\n    char  full_label[] = \"ADCS_LOG: this label is longer than the buffer\";\n\n    strncpy(msg_buf, full_label, sizeof(msg_buf) - 1);\n    msg_buf[sizeof(msg_buf) - 1] = '\\0';\n\n}\n",
+    "standard": "MISRA C:2023"
+  }    
 ]

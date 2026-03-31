@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     max_critique_iterations: int = 4
     confidence_threshold: float = 0.85
 
+    # Node temperatures
+    orchestrator_temperature: float = 0.0
+    validation_temperature: float = 0.1
+    critique_temperature: float = 0.0
+    remediation_temperature: float = 0.2
+
     # CORS
     cors_allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8501", "http://localhost:8080"]
 

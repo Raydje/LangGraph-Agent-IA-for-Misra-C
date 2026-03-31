@@ -2,6 +2,7 @@ import json
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState
 from app.services.llm_service import get_llm
+from app.config import get_settings
 from app.utils import parse_json_response, calculate_gemini_cost, logger
 
 
@@ -12,7 +13,8 @@ def validation_node(state: ComplianceState) -> dict:
     """
     logger.info("--- NODE: VALIDATION ---")
 
-    llm = get_llm(temperature=0.1)
+    settings = get_settings()
+    llm = get_llm(temperature=settings.validation_temperature)
 
     code = state.get("code_snippet", "No code provided.")
     query = state.get("query", "")

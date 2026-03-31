@@ -1,6 +1,7 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState
 from app.services.llm_service import get_llm
+from app.config import get_settings
 from app.utils import calculate_gemini_cost, parse_json_response, logger
 
 
@@ -11,7 +12,8 @@ def remediate_code(state: ComplianceState) -> dict:
     """
     logger.info("--- NODE: REMEDIATION ---")
 
-    llm = get_llm(temperature=0.2)
+    settings = get_settings()
+    llm = get_llm(temperature=settings.remediation_temperature)
 
     code_snippet = state.get("code_snippet", "")
     validation_result = state.get("validation_result", "")
