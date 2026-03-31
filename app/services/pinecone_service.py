@@ -1,3 +1,4 @@
+import asyncio
 from pinecone import Pinecone, ServerlessSpec
 from app.config import get_settings
 from app.utils import logger
@@ -33,7 +34,8 @@ async def query_pinecone(
     filter: dict | None = None,
 ) -> dict:
     index = _get_index()
-    results = index.query(
+    results = await asyncio.to_thread(
+        index.query,
         vector=vector,
         top_k=top_k,
         filter=filter,
@@ -58,7 +60,7 @@ async def upsert_vectors(vectors: list[dict]) -> int:
     total = 0
     for i in range(0, len(vectors), batch_size):
         batch = vectors[i : i + batch_size]
-        index.upsert(vectors=batch)
-        logger.info(f"✅ Successfully upserted {len(batch)} vectors to Pinecone!")
+        await asyncio.to_thread(index.upsert, vectors=batch)
+        logger.info(f"Successfully upserted {len(batch)} vectors to Pinecone!")
         total += len(batch)
     return total

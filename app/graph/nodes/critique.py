@@ -6,7 +6,7 @@ from app.config import get_settings
 from app.utils import parse_json_response, calculate_gemini_cost, logger
 
 
-def critique_node(state: ComplianceState) -> dict:
+async def critique_node(state: ComplianceState) -> dict:
     """
     Meta-reviewer that detects hallucinations or logical flaws in the validation result.
     Evaluates the output against 5 strict criteria specific to MISRA C:2023.
@@ -66,7 +66,7 @@ Based on the 5 criteria, generate your JSON verdict."""
         HumanMessage(content=human_content),
     ]
 
-    response = llm.invoke(messages)
+    response = await llm.ainvoke(messages)
     try:
         result = parse_json_response(response.content)
         approved = result.get("approved", False)

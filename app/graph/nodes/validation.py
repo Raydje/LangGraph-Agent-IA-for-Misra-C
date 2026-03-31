@@ -1,12 +1,35 @@
-import json
+from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState
 from app.services.llm_service import get_llm
 from app.config import get_settings
-from app.utils import parse_json_response, calculate_gemini_cost, logger
+from app.utils import calculate_gemini_cost, logger
 
 
-def validation_node(state: ComplianceState) -> dict:
+# Structured output schema — guarantees valid typed output from the LLM
+class ValidationOutput(BaseModel):
+    is_compliant: bool = Field(
+        description="True only if the code fully satisfies all applicable retrieved rules."
+    )
+    validation_result: str = Field(
+        description=(
+            "Detailed explanation of each violation or confirmation of compliance. "
+            "Reference specific lines when possible. Every rule mentioned MUST use "
+            "the format 'Rule ID (Category): ...' — e.g., 'Rule MISRA_15.5 (Required): ...'."
+        )
+    )
+    confidence_score: float = Field(
+        description="Float between 0.0 and 1.0 indicating confidence in the assessment."
+    )
+    cited_rules: list[str] = Field(
+        description=(
+            "List of MISRA C:2023 rule IDs used in the evaluation "
+            "(e.g., ['Rule MISRA_15.5', 'Dir 4.1'])."
+        )
+    )
+
+
+async def validation_node(state: ComplianceState) -> dict:
     """
     Evaluates the provided code snippet against the retrieved MISRA C:2023 rules.
     Takes critique feedback into account if this is a subsequent iteration.
@@ -22,7 +45,7 @@ def validation_node(state: ComplianceState) -> dict:
     critique_feedback = state.get("critique_feedback", "")
     iteration = state.get("iteration_count", 0)
     logger.info("Validation_node", query=query, code_snippet=code, iteration=iteration)
-    
+
     # Format retrieved rules — MISRA C:2023 IDs are either "Dir X.Y" or "Rule MISRA_X.Y"
     rules_context = "\n\n".join(
         [f"Rule ID: {r['rule_id']}\nCategory: {r.get('category', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"
@@ -37,14 +60,6 @@ MISRA C:2023 rule IDs follow these formats:
 - Rules: "Rule MISRA_X.Y" (e.g., "Rule MISRA_15.5")
 Categories are: Mandatory, Required, or Advisory.
 
-You MUST respond with a valid JSON object matching this schema exactly:
-{
-  "is_compliant": bool,
-  "validation_result": "string",
-  "confidence_score": float,
-  "cited_rules": ["string"]
-}
-
 Field details:
 - "is_compliant": true only if the code fully satisfies all applicable retrieved rules.
 - "validation_result": detailed explanation of each violation or confirmation of compliance. Reference specific lines when possible.
@@ -52,9 +67,7 @@ Field details:
   "Rule MISRA_15.5 (Required): ..." or "Dir 4.1 (Mandatory): ...".
   The category (Mandatory, Required, or Advisory) is provided for each rule in the context. Never omit it.
 - "confidence_score": float between 0.0 and 1.0.
-- "cited_rules": list of MISRA C:2023 rule IDs used in the evaluation (e.g., ["Rule MISRA_15.5", "Dir 4.1"]).
-
-Do not include any text outside the JSON block."""
+- "cited_rules": list of MISRA C:2023 rule IDs used in the evaluation (e.g., ["Rule MISRA_15.5", "Dir 4.1"])."""
 
     critique_section = ""
     if iteration > 0 and critique_feedback:
@@ -75,17 +88,23 @@ Code to Validate:
 {code}
 ```
 {critique_section}
-Respond with the JSON verdict only."""
+Provide your structured validation verdict."""
 
     messages = [
         SystemMessage(content=system_prompt),
         HumanMessage(content=human_content),
     ]
 
-    response = llm.invoke(messages)
+    # Use with_structured_output for guaranteed Pydantic-validated output
+    structured_llm = llm.with_structured_output(ValidationOutput, include_raw=True)
+    raw_result = await structured_llm.ainvoke(messages)
+
     try:
-        result = parse_json_response(response.content)
-    except (json.JSONDecodeError, ValueError):
+        result: ValidationOutput = raw_result["parsed"]
+        if result is None:
+            raise ValueError("Structured output parsing returned None")
+    except (KeyError, ValueError, AttributeError) as e:
+        logger.error("Validation failed to parse structured output.", error=str(e))
         return {
             "validation_result": "Validation failed: LLM returned unparseable output.",
             "is_compliant": False,
@@ -94,17 +113,18 @@ Respond with the JSON verdict only."""
             "iteration_count": iteration + 1,
             "estimated_cost": 0.0,
         }
+
     # Track validation tokens used
-    validation_usage = getattr(response, "usage_metadata", None) or {}
-    _input_tokens = validation_usage.get("input_tokens", 0)
-    _output_tokens = validation_usage.get("output_tokens", 0)
-    logger.info("Validation_node_result", validation_result=result.get("validation_result", ""), is_compliant=result.get("is_compliant", False), confidence_score=result.get("confidence_score", 0.0), cited_rules=result.get("cited_rules", []), input_tokens=_input_tokens, output_tokens=_output_tokens)
+    usage = getattr(raw_result.get("raw"), "usage_metadata", None) or {}
+    _input_tokens = usage.get("input_tokens", 0)
+    _output_tokens = usage.get("output_tokens", 0)
+    logger.info("Validation_node_result", validation_result=result.validation_result, is_compliant=result.is_compliant, confidence_score=result.confidence_score, cited_rules=result.cited_rules, input_tokens=_input_tokens, output_tokens=_output_tokens)
     logger.info("Validation_node_cost", estimated_cost=calculate_gemini_cost(_input_tokens, _output_tokens))
     return {
-        "validation_result": result.get("validation_result", ""),
-        "is_compliant": result.get("is_compliant", False),
-        "confidence_score": result.get("confidence_score", 0.0),
-        "cited_rules": result.get("cited_rules", []),
+        "validation_result": result.validation_result,
+        "is_compliant": result.is_compliant,
+        "confidence_score": result.confidence_score,
+        "cited_rules": result.cited_rules,
         "iteration_count": iteration + 1,
         "prompt_tokens": _input_tokens,
         "completion_tokens": _output_tokens,

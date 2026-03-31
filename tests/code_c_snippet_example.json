@@ -46,7 +46,7 @@
   },
   {
     "query": "Is this function MISRA-C compliant? Look for buffer overflow risks and unsafe string operations.",
-    "code_snippet": "void write_mission_log(char *label, float value)\n{\n    char  msg_buf[16];\n    char  full_label[] = \"ADCS_LOG: this label is longer than the buffer\";\n\n    strncpy(msg_buf, full_label, sizeof(msg_buf) - 1);\n    msg_buf[sizeof(msg_buf) - 1] = '\\0';\n\n}\n",
+    "code_snippet": "#include <string.h>\n\nvoid write_mission_log(char *label, float value)\n{\n    char  msg_buf[16];\n    char  full_label[] = \"ADCS_LOG: this label is longer than the buffer\";\n\n    memcpy(msg_buf, full_label, sizeof(msg_buf) - 1);\n    msg_buf[sizeof(msg_buf) - 1] = '\\0';\n\n}",
     "standard": "MISRA C:2023"
-  }    
+  }      
 ]

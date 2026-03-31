@@ -6,7 +6,7 @@ from app.config import get_settings
 from app.utils import calculate_gemini_cost, parse_json_response, logger
 
 
-def remediate_code(state: ComplianceState) -> dict:
+async def remediate_code(state: ComplianceState) -> dict:
     """
     Remediation Node: Takes a non-compliant C code snippet and attempts to fix it
     based on the cited rules and validation results.
@@ -81,7 +81,7 @@ Respond with the JSON object only."""
         HumanMessage(content=human_content),
     ]
 
-    response = llm.invoke(messages)
+    response = await llm.ainvoke(messages)
     try:
         result = parse_json_response(response.content)
         fixed_code = result.get("fixed_code_snippet", "")

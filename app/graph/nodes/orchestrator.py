@@ -16,7 +16,7 @@ class OrchestratorOutput(BaseModel):
     )
 
 # 2. Define the Orchestrator Node function
-def orchestrate(state: ComplianceState) -> dict:
+async def orchestrate(state: ComplianceState) -> dict:
     """
     Analyzes the user's query and code snippet to determine the workflow intent.
     Currently focused entirely on MISRA C:2023 compliance.
@@ -51,7 +51,7 @@ def orchestrate(state: ComplianceState) -> dict:
     chain = prompt | llm.with_structured_output(OrchestratorOutput, include_raw=True)
 
     # Invoke the chain with the current state data
-    raw_result = chain.invoke({
+    raw_result = await chain.ainvoke({
         "query": query,
         "code": code_snippet if code_snippet else "None provided."
     })

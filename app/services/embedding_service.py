@@ -35,7 +35,7 @@ class EmbeddingService:
         
         texts = [rule["full_text"] for rule in rules]
 
-        all_embeddings = self.embeddings.embed_documents(texts)
+        all_embeddings = await self.embeddings.aembed_documents(texts)
 
         logger.info("Packaging vectors...")
         
