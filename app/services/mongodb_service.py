@@ -1,10 +1,11 @@
 from motor.motor_asyncio import AsyncIOMotorClient
+import re
 from app.config import get_settings
 
 _client = None
 _db = None
 
-_INDEX_FIELDS = [("section", 1), ("rule_number", 1)]
+_INDEX_FIELDS = [("rule_type", 1), ("section", 1), ("rule_number", 1)]
 
 
 def _get_db():
@@ -29,20 +30,20 @@ async def get_rules_by_ids(rule_ids: list[str]) -> list[dict]:
 
 async def get_misra_rules_by_pinecone_ids(rule_ids: list[str]) -> list[dict]:
     """
-    Resolves Pinecone IDs (e.g. 'MISRA_15.1') to MongoDB documents.
-    MongoDB stores rules with separate 'section' and 'rule_number' int fields.
+    Resolves Pinecone IDs (e.g. 'MISRA_RULE_15.1', 'MISRA_DIR_4.1') to MongoDB documents.
+    MongoDB stores rules with separate 'rule_type', 'section' and 'rule_number' int fields.
     Returns each doc annotated with a 'rule_id' key matching the original Pinecone ID.
     """
+    _ID_RE = re.compile(r'^MISRA_(RULE|DIR)_(\d+)\.(\d+)$')
     or_conditions = []
-    id_map: dict[tuple, str] = {}  # (section, rule_number) -> original Pinecone ID
+    id_map: dict[tuple, str] = {}  # (rule_type, section, rule_number) -> original Pinecone ID
 
     for rid in rule_ids:
-        # Expected format: MISRA_{section}.{rule_number}
-        parts = rid.removeprefix("MISRA_").split(".")
-        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
-            section, rule_number = int(parts[0]), int(parts[1])
-            or_conditions.append({"section": section, "rule_number": rule_number})
-            id_map[(section, rule_number)] = rid
+        m = _ID_RE.match(rid)
+        if m:
+            rule_type, section, rule_number = m.group(1), int(m.group(2)), int(m.group(3))
+            or_conditions.append({"rule_type": rule_type, "section": section, "rule_number": rule_number})
+            id_map[(rule_type, section, rule_number)] = rid
 
     if not or_conditions:
         return []
@@ -52,7 +53,7 @@ async def get_misra_rules_by_pinecone_ids(rule_ids: list[str]) -> list[dict]:
     docs = await cursor.to_list(length=100)
 
     for doc in docs:
-        key = (doc.get("section"), doc.get("rule_number"))
+        key = (doc.get("rule_type"), doc.get("section"), doc.get("rule_number"))
         doc["rule_id"] = id_map.get(key, "")
 
     return docs
@@ -75,4 +76,8 @@ async def insert_rules(rules: list[dict]) -> None:
 
 async def create_indexes() -> None:
     coll = await get_rules_collection()
+    try:
+        await coll.drop_index("section_1_rule_number_1")
+    except Exception:
+        pass  # Index doesn't exist — that's fine
     await coll.create_index(_INDEX_FIELDS, unique=True)

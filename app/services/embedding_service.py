@@ -41,10 +41,12 @@ class EmbeddingService:
         
         vectors = []
         for rule, embedding_vector in zip(rules, all_embeddings):
-            vector_id = f"MISRA_{rule['section']}.{rule['rule_number']}"
-            
+            rule_type = rule.get("rule_type", "Rule")
+            vector_id = f"MISRA_{rule_type.upper()}_{rule['section']}.{rule['rule_number']}"
+
             metadata = {
                 "scope": rule["scope"],
+                "rule_type": rule_type,
                 "section": rule["section"],
                 "rule_number": rule["rule_number"],
                 "category": rule["category"],

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState
-from app.services.llm_service import get_llm
+from app.services.llm_service import get_structured_llm
 from app.config import get_settings
 from app.utils import calculate_gemini_cost, logger
 
@@ -28,7 +28,7 @@ async def remediate_code(state: ComplianceState) -> dict:
     logger.info("--- NODE: REMEDIATION ---")
 
     settings = get_settings()
-    llm = get_llm(temperature=settings.remediation_temperature)
+    structured_llm = get_structured_llm(RemediationOutput, temperature=settings.remediation_temperature)
 
     code_snippet = state.get("code_snippet", "")
     validation_result = state.get("validation_result", "")
@@ -88,7 +88,6 @@ Provide your structured remediation output."""
     ]
 
     # Use with_structured_output for guaranteed Pydantic-validated output
-    structured_llm = llm.with_structured_output(RemediationOutput, include_raw=True)
     raw_result = await structured_llm.ainvoke(messages)
 
     try:

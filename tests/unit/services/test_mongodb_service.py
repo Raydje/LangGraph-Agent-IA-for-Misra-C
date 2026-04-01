@@ -23,8 +23,8 @@ def _make_mock_collection(docs: list[dict]) -> MagicMock:
 @pytest.mark.asyncio
 async def test_valid_ids_return_annotated_docs():
     docs = [
-        {"section": 15, "rule_number": 1, "title": "No recursion"},
-        {"section": 1, "rule_number": 3, "title": "Undefined behaviour"},
+        {"rule_type": "RULE", "section": 15, "rule_number": 1, "title": "No recursion"},
+        {"rule_type": "RULE", "section": 1, "rule_number": 3, "title": "Undefined behaviour"},
     ]
     mock_coll = _make_mock_collection(docs)
     with patch(
@@ -32,12 +32,29 @@ async def test_valid_ids_return_annotated_docs():
         new_callable=AsyncMock,
         return_value=mock_coll,
     ):
-        result = await get_misra_rules_by_pinecone_ids(["MISRA_15.1", "MISRA_1.3"])
+        result = await get_misra_rules_by_pinecone_ids(["MISRA_RULE_15.1", "MISRA_RULE_1.3"])
 
     assert len(result) == 2
     rule_ids = {doc["rule_id"] for doc in result}
-    assert "MISRA_15.1" in rule_ids
-    assert "MISRA_1.3" in rule_ids
+    assert "MISRA_RULE_15.1" in rule_ids
+    assert "MISRA_RULE_1.3" in rule_ids
+
+
+@pytest.mark.asyncio
+async def test_dir_ids_return_annotated_docs():
+    docs = [
+        {"rule_type": "DIR", "section": 4, "rule_number": 1, "title": "Run-time failures shall be minimized"},
+    ]
+    mock_coll = _make_mock_collection(docs)
+    with patch(
+        "app.services.mongodb_service.get_rules_collection",
+        new_callable=AsyncMock,
+        return_value=mock_coll,
+    ):
+        result = await get_misra_rules_by_pinecone_ids(["MISRA_DIR_4.1"])
+
+    assert len(result) == 1
+    assert result[0]["rule_id"] == "MISRA_DIR_4.1"
 
 
 @pytest.mark.asyncio
@@ -70,54 +87,54 @@ async def test_all_malformed_ids_skips_db():
 
 @pytest.mark.asyncio
 async def test_mixed_valid_and_malformed_ids_only_queries_valid():
-    docs = [{"section": 1, "rule_number": 1, "title": "T1"}]
+    docs = [{"rule_type": "RULE", "section": 1, "rule_number": 1, "title": "T1"}]
     mock_coll = _make_mock_collection(docs)
     with patch(
         "app.services.mongodb_service.get_rules_collection",
         new_callable=AsyncMock,
         return_value=mock_coll,
     ):
-        result = await get_misra_rules_by_pinecone_ids(["MISRA_1.1", "bad_id", "MISRA_abc.1"])
+        result = await get_misra_rules_by_pinecone_ids(["MISRA_RULE_1.1", "bad_id", "MISRA_abc.1"])
 
     assert len(result) == 1
-    assert result[0]["rule_id"] == "MISRA_1.1"
+    assert result[0]["rule_id"] == "MISRA_RULE_1.1"
 
 
 @pytest.mark.asyncio
 async def test_rule_id_annotated_on_returned_doc():
-    doc = {"section": 15, "rule_number": 5, "title": "No goto"}
+    doc = {"rule_type": "RULE", "section": 15, "rule_number": 5, "title": "No goto"}
     mock_coll = _make_mock_collection([doc])
     with patch(
         "app.services.mongodb_service.get_rules_collection",
         new_callable=AsyncMock,
         return_value=mock_coll,
     ):
-        result = await get_misra_rules_by_pinecone_ids(["MISRA_15.5"])
+        result = await get_misra_rules_by_pinecone_ids(["MISRA_RULE_15.5"])
 
-    assert result[0]["rule_id"] == "MISRA_15.5"
+    assert result[0]["rule_id"] == "MISRA_RULE_15.5"
 
 
 @pytest.mark.asyncio
 async def test_find_called_with_correct_or_conditions():
-    doc = {"section": 15, "rule_number": 1, "title": "T"}
+    doc = {"rule_type": "RULE", "section": 15, "rule_number": 1, "title": "T"}
     mock_coll = _make_mock_collection([doc])
     with patch(
         "app.services.mongodb_service.get_rules_collection",
         new_callable=AsyncMock,
         return_value=mock_coll,
     ):
-        await get_misra_rules_by_pinecone_ids(["MISRA_15.1"])
+        await get_misra_rules_by_pinecone_ids(["MISRA_RULE_15.1"])
 
     call_filter = mock_coll.find.call_args[0][0]
     assert "$or" in call_filter
-    assert {"section": 15, "rule_number": 1} in call_filter["$or"]
+    assert {"rule_type": "RULE", "section": 15, "rule_number": 1} in call_filter["$or"]
 
 
 @pytest.mark.asyncio
 async def test_multiple_ids_build_multiple_or_conditions():
     docs = [
-        {"section": 1, "rule_number": 1},
-        {"section": 2, "rule_number": 3},
+        {"rule_type": "RULE", "section": 1, "rule_number": 1},
+        {"rule_type": "RULE", "section": 2, "rule_number": 3},
     ]
     mock_coll = _make_mock_collection(docs)
     with patch(
@@ -125,7 +142,7 @@ async def test_multiple_ids_build_multiple_or_conditions():
         new_callable=AsyncMock,
         return_value=mock_coll,
     ):
-        await get_misra_rules_by_pinecone_ids(["MISRA_1.1", "MISRA_2.3"])
+        await get_misra_rules_by_pinecone_ids(["MISRA_RULE_1.1", "MISRA_RULE_2.3"])
 
     call_filter = mock_coll.find.call_args[0][0]
     assert len(call_filter["$or"]) == 2
@@ -133,14 +150,14 @@ async def test_multiple_ids_build_multiple_or_conditions():
 
 @pytest.mark.asyncio
 async def test_excludes_id_field_from_projection():
-    doc = {"section": 1, "rule_number": 1}
+    doc = {"rule_type": "RULE", "section": 1, "rule_number": 1}
     mock_coll = _make_mock_collection([doc])
     with patch(
         "app.services.mongodb_service.get_rules_collection",
         new_callable=AsyncMock,
         return_value=mock_coll,
     ):
-        await get_misra_rules_by_pinecone_ids(["MISRA_1.1"])
+        await get_misra_rules_by_pinecone_ids(["MISRA_RULE_1.1"])
 
     projection = mock_coll.find.call_args[0][1]
     assert projection == {"_id": 0}

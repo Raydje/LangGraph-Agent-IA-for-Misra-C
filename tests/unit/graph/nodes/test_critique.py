@@ -6,12 +6,12 @@ from app.graph.nodes.critique import critique_node, CritiqueOutput
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _mock_llm(
+def _mock_structured_llm(
     parsed: CritiqueOutput | None,
     input_tokens: int = 0,
     output_tokens: int = 0,
 ) -> MagicMock:
-    """Mock get_llm() that supports .with_structured_output(...).ainvoke()."""
+    """Mock for get_structured_llm() — returns a Runnable with .ainvoke() directly."""
     raw = MagicMock()
     raw.usage_metadata = {"input_tokens": input_tokens, "output_tokens": output_tokens}
 
@@ -21,10 +21,7 @@ def _mock_llm(
         "parsed": parsed,
         "parsing_error": None if parsed else ValueError("parse failed"),
     })
-
-    llm = MagicMock()
-    llm.with_structured_output = MagicMock(return_value=structured_chain)
-    return llm
+    return structured_chain
 
 
 def _base_state(**overrides) -> dict:
@@ -45,7 +42,7 @@ def _base_state(**overrides) -> dict:
 
 async def test_approved_sets_critique_approved_true():
     parsed = CritiqueOutput(approved=True, feedback="Pass")
-    with patch("app.graph.nodes.critique.get_llm", return_value=_mock_llm(parsed)):
+    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(parsed)):
         result = await critique_node(_base_state())
 
     assert result["critique_approved"] is True
@@ -54,7 +51,7 @@ async def test_approved_sets_critique_approved_true():
 
 async def test_rejected_sets_critique_approved_false_with_feedback():
     parsed = CritiqueOutput(approved=False, feedback="Criteria 1 failed: hallucinated rule.")
-    with patch("app.graph.nodes.critique.get_llm", return_value=_mock_llm(parsed)):
+    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(parsed)):
         result = await critique_node(_base_state())
 
     assert result["critique_approved"] is False
@@ -62,7 +59,7 @@ async def test_rejected_sets_critique_approved_false_with_feedback():
 
 
 async def test_parse_failure_sets_not_approved():
-    with patch("app.graph.nodes.critique.get_llm", return_value=_mock_llm(parsed=None)):
+    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(parsed=None)):
         result = await critique_node(_base_state())
 
     assert result["critique_approved"] is False
@@ -72,7 +69,7 @@ async def test_parse_failure_sets_not_approved():
 
 async def test_returns_only_expected_state_keys():
     parsed = CritiqueOutput(approved=True, feedback="Pass")
-    with patch("app.graph.nodes.critique.get_llm", return_value=_mock_llm(parsed)):
+    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(parsed)):
         result = await critique_node(_base_state())
 
     assert {"critique_approved", "critique_feedback"}.issubset(result.keys())
@@ -80,7 +77,7 @@ async def test_returns_only_expected_state_keys():
 
 async def test_empty_retrieved_rules_no_crash():
     parsed = CritiqueOutput(approved=True, feedback="Pass")
-    with patch("app.graph.nodes.critique.get_llm", return_value=_mock_llm(parsed)):
+    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(parsed)):
         result = await critique_node(_base_state(retrieved_rules=[]))
 
     assert result["critique_approved"] is True
@@ -88,7 +85,7 @@ async def test_empty_retrieved_rules_no_crash():
 
 async def test_non_compliant_state_no_crash():
     parsed = CritiqueOutput(approved=False, feedback="Logical inconsistency.")
-    with patch("app.graph.nodes.critique.get_llm", return_value=_mock_llm(parsed)):
+    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(parsed)):
         result = await critique_node(
             _base_state(is_compliant=False, validation_result="Recursion found.")
         )
@@ -96,25 +93,19 @@ async def test_non_compliant_state_no_crash():
     assert result["critique_approved"] is False
 
 
-async def test_get_llm_called_with_zero_temperature():
+async def test_get_structured_llm_called_with_critique_output_schema():
     parsed = CritiqueOutput(approved=True, feedback="Pass")
-    with patch("app.graph.nodes.critique.get_llm", return_value=_mock_llm(parsed)) as mock_get_llm:
+    with patch("app.graph.nodes.critique.get_structured_llm") as mock_get_structured_llm:
+        mock_get_structured_llm.return_value = _mock_structured_llm(parsed)
         await critique_node(_base_state())
 
-    mock_get_llm.assert_called_once_with(temperature=0.0)
-
-
-async def test_with_structured_output_called_with_correct_schema():
-    mock = _mock_llm(CritiqueOutput(approved=True, feedback="Pass"))
-    with patch("app.graph.nodes.critique.get_llm", return_value=mock):
-        await critique_node(_base_state())
-
-    mock.with_structured_output.assert_called_once_with(CritiqueOutput, include_raw=True)
+    mock_get_structured_llm.assert_called_once()
+    assert mock_get_structured_llm.call_args[0][0] == CritiqueOutput
 
 
 async def test_critique_history_populated_on_approval():
     parsed = CritiqueOutput(approved=True, feedback="Pass")
-    with patch("app.graph.nodes.critique.get_llm", return_value=_mock_llm(parsed)):
+    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(parsed)):
         result = await critique_node(_base_state(iteration_count=2))
 
     assert len(result["critique_history"]) == 1
@@ -126,7 +117,7 @@ async def test_critique_history_populated_on_approval():
 
 async def test_critique_history_populated_on_rejection():
     parsed = CritiqueOutput(approved=False, feedback="Rule hallucination detected.")
-    with patch("app.graph.nodes.critique.get_llm", return_value=_mock_llm(parsed)):
+    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(parsed)):
         result = await critique_node(_base_state(iteration_count=1))
 
     entry = result["critique_history"][0]

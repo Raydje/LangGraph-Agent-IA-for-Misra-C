@@ -41,32 +41,34 @@ def parse_misra_file(filepath: str) -> list[dict]:
         return []
 
     current_rule = None
-    
-    # Regex to match lines like: "Rule 1.1    Required" or "Rule 22.15\tMandatory"
-    header_pattern = re.compile(r'^Rule\s+(\d+)\.(\d+)\s+(.+)$')
+
+    # Regex to match lines like: "Rule 1.1    Required", "Dir 4.1\tRequired", or "Rule 22.15\tMandatory"
+    header_pattern = re.compile(r'^(Rule|Dir)\s+(\d+)\.(\d+)\s+(.+)$')
 
     for line in lines:
         line = line.strip()
-        
+
         # Skip comments and empty lines
         if not line or line.startswith('#'):
             continue
-            
+
         header_match = header_pattern.match(line)
-        
+
         if header_match:
             # If we were already building a rule, save it before starting a new one
             if current_rule and current_rule.get('full_text'):
                 rules.append(current_rule)
-            
+
             # Extract metadata using regex groups
-            section = int(header_match.group(1))
-            rule_number = int(header_match.group(2))
-            category = header_match.group(3).strip()
-            
+            rule_type = header_match.group(1).upper()   # "RULE" or "DIR"
+            section = int(header_match.group(2))
+            rule_number = int(header_match.group(3))
+            category = header_match.group(4).strip()
+
             # Initialize the new rule object
             current_rule = {
                 "scope": "MISRA C:2023",
+                "rule_type": rule_type,
                 "section": section,
                 "rule_number": rule_number,
                 "category": category,
@@ -101,7 +103,7 @@ async def upload_to_mongodb(rules: list[dict]):
 
     operations = []
     for rule in rules:
-        query = {"section": rule["section"], "rule_number": rule["rule_number"]}
+        query = {"rule_type": rule["rule_type"], "section": rule["section"], "rule_number": rule["rule_number"]}
         operations.append(ReplaceOne(query, rule, upsert=True))
 
     if operations:

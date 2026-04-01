@@ -28,12 +28,12 @@ def _make_rule(rule_id: str, category: str = "Required", title: str = "A rule", 
     return {"rule_id": rule_id, "category": category, "title": title, "full_text": full_text}
 
 
-def _mock_llm(
+def _mock_structured_llm(
     parsed: RemediationOutput | None,
     input_tokens: int = 0,
     output_tokens: int = 0,
 ) -> MagicMock:
-    """Mock get_llm() that supports .with_structured_output(...).ainvoke()."""
+    """Mock for get_structured_llm() — returns a Runnable with .ainvoke() directly."""
     raw = MagicMock()
     raw.usage_metadata = {"input_tokens": input_tokens, "output_tokens": output_tokens}
 
@@ -43,10 +43,7 @@ def _mock_llm(
         "parsed": parsed,
         "parsing_error": None if parsed else ValueError("parse failed"),
     })
-
-    llm = MagicMock()
-    llm.with_structured_output = MagicMock(return_value=structured_chain)
-    return llm
+    return structured_chain
 
 
 VALID_OUTPUT = RemediationOutput(
@@ -59,9 +56,9 @@ VALID_OUTPUT = RemediationOutput(
 # Tests
 # ---------------------------------------------------------------------------
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_happy_path_returns_fixed_code(mock_get_llm):
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_happy_path_returns_fixed_code(mock_get_structured_llm):
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     state = _make_state(cited_rules=["MISRA-21.3"], retrieved_rules=[_make_rule("MISRA-21.3")])
     result = await remediate_code(state)
@@ -70,9 +67,9 @@ async def test_happy_path_returns_fixed_code(mock_get_llm):
     assert result["remediation_explanation"] == VALID_OUTPUT.remediation_explanation
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_returns_correct_state_keys(mock_get_llm):
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_returns_correct_state_keys(mock_get_structured_llm):
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     result = await remediate_code(_make_state())
 
@@ -88,9 +85,9 @@ async def test_returns_correct_state_keys(mock_get_llm):
     assert set(result.keys()) == expected_keys
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_parse_failure_returns_original_code(mock_get_llm):
-    mock_get_llm.return_value = _mock_llm(parsed=None)
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_parse_failure_returns_original_code(mock_get_structured_llm):
+    mock_get_structured_llm.return_value = _mock_structured_llm(parsed=None)
 
     code = "int x = 1;"
     result = await remediate_code(_make_state(code_snippet=code))
@@ -102,10 +99,10 @@ async def test_parse_failure_returns_original_code(mock_get_llm):
     assert result["estimated_cost"] == 0.0
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_only_cited_rules_appear_in_llm_context(mock_get_llm):
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_only_cited_rules_appear_in_llm_context(mock_get_structured_llm):
     """Only cited rules should be forwarded in the prompt; uncited rules must be excluded."""
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     state = _make_state(
         cited_rules=["MISRA-1.1"],
@@ -116,9 +113,7 @@ async def test_only_cited_rules_appear_in_llm_context(mock_get_llm):
     )
     await remediate_code(state)
 
-    # The structured chain's ainvoke receives the messages list
-    structured_chain = mock_get_llm.return_value.with_structured_output.return_value
-    call_args = structured_chain.ainvoke.call_args[0][0]
+    call_args = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
     human_content = next(
         m.content for m in call_args
         if hasattr(m, "content") and ("Cited rule" in m.content or "Uncited rule" in m.content)
@@ -127,10 +122,10 @@ async def test_only_cited_rules_appear_in_llm_context(mock_get_llm):
     assert "Uncited rule" not in human_content
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_fallback_to_all_rules_when_no_cited_match(mock_get_llm):
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_fallback_to_all_rules_when_no_cited_match(mock_get_structured_llm):
     """When cited_rules IDs don't match retrieved_rules, all rules are shown as fallback."""
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     state = _make_state(
         cited_rules=["MISRA-99.99"],  # no match
@@ -138,38 +133,36 @@ async def test_fallback_to_all_rules_when_no_cited_match(mock_get_llm):
     )
     await remediate_code(state)
 
-    structured_chain = mock_get_llm.return_value.with_structured_output.return_value
-    call_args = structured_chain.ainvoke.call_args[0][0]
+    call_args = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
     human_content = next(m.content for m in call_args if hasattr(m, "content") and ("Fallback rule" in m.content or "No rule details" in m.content))
     assert "Fallback rule" in human_content
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_no_retrieved_rules_uses_default_message(mock_get_llm):
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_no_retrieved_rules_uses_default_message(mock_get_structured_llm):
     """When retrieved_rules is empty and cited_rules is empty, fallback text is used."""
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     state = _make_state(cited_rules=[], retrieved_rules=[])
     await remediate_code(state)
 
-    structured_chain = mock_get_llm.return_value.with_structured_output.return_value
-    call_args = structured_chain.ainvoke.call_args[0][0]
+    call_args = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
     human_content = next(m.content for m in call_args if hasattr(m, "content") and "No rule details available" in m.content)
     assert "No rule details available." in human_content
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_empty_state_does_not_crash(mock_get_llm):
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_empty_state_does_not_crash(mock_get_structured_llm):
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     result = await remediate_code({})
 
     assert "fixed_code_snippet" in result
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_token_counts_from_usage_metadata(mock_get_llm):
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT, input_tokens=200, output_tokens=80)
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_token_counts_from_usage_metadata(mock_get_structured_llm):
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT, input_tokens=200, output_tokens=80)
 
     result = await remediate_code(_make_state())
 
@@ -179,8 +172,8 @@ async def test_token_counts_from_usage_metadata(mock_get_llm):
     assert result["remediation_tokens"] == 280
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_missing_usage_metadata_defaults_to_zero(mock_get_llm):
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_missing_usage_metadata_defaults_to_zero(mock_get_structured_llm):
     raw = MagicMock(spec=[])  # no usage_metadata attribute
     structured_chain = MagicMock()
     structured_chain.ainvoke = AsyncMock(return_value={
@@ -188,9 +181,7 @@ async def test_missing_usage_metadata_defaults_to_zero(mock_get_llm):
         "parsed": VALID_OUTPUT,
         "parsing_error": None,
     })
-    llm = MagicMock()
-    llm.with_structured_output = MagicMock(return_value=structured_chain)
-    mock_get_llm.return_value = llm
+    mock_get_structured_llm.return_value = structured_chain
 
     result = await remediate_code(_make_state())
 
@@ -198,66 +189,55 @@ async def test_missing_usage_metadata_defaults_to_zero(mock_get_llm):
     assert result["completion_tokens"] == 0
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_llm_called_with_temperature_02(mock_get_llm):
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_get_structured_llm_called_with_remediation_output_schema(mock_get_structured_llm):
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     await remediate_code(_make_state())
 
-    mock_get_llm.assert_called_once_with(temperature=0.2)
+    mock_get_structured_llm.assert_called_once()
+    assert mock_get_structured_llm.call_args[0][0] == RemediationOutput
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_with_structured_output_called_with_correct_schema(mock_get_llm):
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
-
-    await remediate_code(_make_state())
-
-    mock_get_llm.return_value.with_structured_output.assert_called_once_with(RemediationOutput, include_raw=True)
-
-
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_llm_invoked_with_system_and_human_messages(mock_get_llm):
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_llm_invoked_with_system_and_human_messages(mock_get_structured_llm):
     from langchain_core.messages import SystemMessage, HumanMessage
 
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     await remediate_code(_make_state())
 
-    structured_chain = mock_get_llm.return_value.with_structured_output.return_value
-    messages = structured_chain.ainvoke.call_args[0][0]
+    messages = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
     assert isinstance(messages[0], SystemMessage)
     assert isinstance(messages[1], HumanMessage)
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_human_message_contains_code_snippet(mock_get_llm):
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_human_message_contains_code_snippet(mock_get_structured_llm):
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     code = "volatile int *ptr = (int*)0xDEAD;"
     await remediate_code(_make_state(code_snippet=code))
 
-    structured_chain = mock_get_llm.return_value.with_structured_output.return_value
-    messages = structured_chain.ainvoke.call_args[0][0]
+    messages = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
     assert code in messages[1].content
 
 
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_human_message_contains_validation_result(mock_get_llm):
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT)
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_human_message_contains_validation_result(mock_get_structured_llm):
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
     validation = "Violated Rule 11.3: cast from int to pointer."
     await remediate_code(_make_state(validation_result=validation))
 
-    structured_chain = mock_get_llm.return_value.with_structured_output.return_value
-    messages = structured_chain.ainvoke.call_args[0][0]
+    messages = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
     assert validation in messages[1].content
 
 
 @patch("app.graph.nodes.remedier.calculate_gemini_cost")
-@patch("app.graph.nodes.remedier.get_llm")
-async def test_estimated_cost_uses_calculate_gemini_cost(mock_get_llm, mock_cost):
-    mock_get_llm.return_value = _mock_llm(VALID_OUTPUT, input_tokens=100, output_tokens=50)
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_estimated_cost_uses_calculate_gemini_cost(mock_get_structured_llm, mock_cost):
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT, input_tokens=100, output_tokens=50)
     mock_cost.return_value = 0.0042
 
     result = await remediate_code(_make_state())

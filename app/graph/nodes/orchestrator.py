@@ -2,7 +2,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from app.models.state import ComplianceState
-from app.services.llm_service import get_llm
+from app.services.llm_service import get_structured_llm
 from app.config import get_settings
 from app.utils import calculate_gemini_cost, logger
 
@@ -27,28 +27,28 @@ async def orchestrate(state: ComplianceState) -> dict:
     logger.info("Orchestrator_node", query=query, code_snippet=code_snippet)
     # Initialize the base LLM (temperature=0.0 for deterministic classification)
     settings = get_settings()
-    llm = get_llm(temperature=settings.orchestrator_temperature)
-    
+    structured_llm = get_structured_llm(OrchestratorOutput, temperature=settings.orchestrator_temperature)
+
     # Create the prompt instructing the LLM on how to classify for MISRA C:2023
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are the intelligent routing orchestrator for a C/C++ static analysis AI agent.
         Your job is to analyze the user's request regarding the MISRA C:2023 standard and classify it into one of three intents:
-        
-        1. "search": The user is looking for specific MISRA C:2023 rules, guidelines, or documentation. 
+
+        1. "search": The user is looking for specific MISRA C:2023 rules, guidelines, or documentation.
            (e.g., "Find rules about dead code", "What does MISRA say about pointer arithmetic?")
         2. "validate": The user has provided C/C++ code and wants to check if it complies with MISRA C:2023 rules.
            (e.g., "Check this C code snippet against MISRA C:2023", "Does this function violate any MISRA directives?")
         3. "explain": The user wants a detailed, conceptual explanation of a specific MISRA C:2023 rule or why a practice is banned.
            (e.g., "Explain why recursion is banned in MISRA", "What is the rationale behind rule 11.4?")
-           
+
         Analyze the inputs carefully and output the intent and your reasoning.
         """),
         ("human", "User Query: {query}\n\nProvided Code (if any):\n{code}")
     ])
-    
+
     # Chain the prompt and the structured LLM together
     # include_raw=True returns {"raw": AIMessage, "parsed": OrchestratorOutput, "parsing_error": ...}
-    chain = prompt | llm.with_structured_output(OrchestratorOutput, include_raw=True)
+    chain = prompt | structured_llm
 
     # Invoke the chain with the current state data
     raw_result = await chain.ainvoke({

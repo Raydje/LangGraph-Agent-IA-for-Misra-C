@@ -71,7 +71,7 @@ async def query_compliance(
         config = {"configurable": {"thread_id": thread_id}}
         result = await graph.ainvoke(initial_state, config=config)
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Unable to process query may gemini is down}")
+        raise HTTPException(status_code=500, detail="Unable to process query maybe gemini is down")
 
     return _build_response(thread_id, result)
 
@@ -115,7 +115,7 @@ async def replay_from_checkpoint(
         result = await graph.ainvoke(None, config=config)
     except Exception as e:
         logger.exception("Replay failed for thread=%s checkpoint=%s", thread_id, checkpoint_id)
-        raise HTTPException(status_code=500, detail=f"Replay failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Replay failed: maybe wrong checkpoint_id or gemini is down")
 
     return _build_response(thread_id, result)
 

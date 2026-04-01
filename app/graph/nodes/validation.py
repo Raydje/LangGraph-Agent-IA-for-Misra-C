@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState
-from app.services.llm_service import get_llm
+from app.services.llm_service import get_structured_llm
 from app.config import get_settings
 from app.utils import calculate_gemini_cost, logger
 
@@ -37,7 +37,7 @@ async def validation_node(state: ComplianceState) -> dict:
     logger.info("--- NODE: VALIDATION ---")
 
     settings = get_settings()
-    llm = get_llm(temperature=settings.validation_temperature)
+    structured_llm = get_structured_llm(ValidationOutput, temperature=settings.validation_temperature)
 
     code = state.get("code_snippet", "No code provided.")
     query = state.get("query", "")
@@ -96,7 +96,6 @@ Provide your structured validation verdict."""
     ]
 
     # Use with_structured_output for guaranteed Pydantic-validated output
-    structured_llm = llm.with_structured_output(ValidationOutput, include_raw=True)
     raw_result = await structured_llm.ainvoke(messages)
 
     try:

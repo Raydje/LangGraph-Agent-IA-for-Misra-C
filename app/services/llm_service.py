@@ -1,5 +1,6 @@
-from typing import Type, TypeVar, Optional, Any
+from typing import Type, TypeVar
 from pydantic import BaseModel
+from langchain_core.runnables import Runnable
 from langchain_google_genai import ChatGoogleGenerativeAI
 from app.config import get_settings
 
@@ -22,7 +23,8 @@ def get_structured_llm(
     response_schema: Type[T],
     temperature: float = 0.0,
     timeout: int = 120,
-) -> Any:
+    raw_bool: bool = True,
+) -> Runnable:
     """
     Returns a Gemini model bound to a specific Pydantic schema.
     Essential for Orchestrator, Validation, and Critique nodes to guarantee JSON output.
@@ -30,4 +32,4 @@ def get_structured_llm(
     """
     llm = get_llm(temperature=temperature, timeout=timeout)
     # with_structured_output forces the LLM to return data matching the Pydantic schema
-    return llm.with_structured_output(response_schema)
+    return llm.with_structured_output(response_schema, include_raw=raw_bool)

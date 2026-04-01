@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models.state import ComplianceState, CritiqueEntry
-from app.services.llm_service import get_llm
+from app.services.llm_service import get_structured_llm
 from app.config import get_settings
 from app.utils import calculate_gemini_cost, logger
 
@@ -27,7 +27,7 @@ async def critique_node(state: ComplianceState) -> dict:
     logger.info("--- NODE: CRITIQUE ---")
 
     settings = get_settings()
-    llm = get_llm(temperature=settings.critique_temperature)
+    structured_llm = get_structured_llm(CritiqueOutput, temperature=settings.critique_temperature)
 
     code = state.get("code_snippet", "No code provided.")
     rules = state.get("retrieved_rules", [])
@@ -72,7 +72,6 @@ Based on the 5 criteria, generate your structured verdict."""
     ]
 
     # Use with_structured_output for guaranteed Pydantic-validated output
-    structured_llm = llm.with_structured_output(CritiqueOutput, include_raw=True)
     raw_result = await structured_llm.ainvoke(messages)
 
     try:

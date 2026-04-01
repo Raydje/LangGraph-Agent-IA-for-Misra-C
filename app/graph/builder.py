@@ -18,7 +18,7 @@ from app.graph.edges import route_after_rag, should_loop_or_finish
 from app.utils import logger
 
 
-def assemble_node(state: ComplianceState) -> dict:
+async def assemble_node(state: ComplianceState) -> dict:
     """
     The 5th node: Formats the final output based on the intent and validation results.
     """

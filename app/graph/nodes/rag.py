@@ -38,7 +38,7 @@ async def rag_node(state: ComplianceState) -> dict[str, Any]:
     scores_map = {match["id"]: match.get("score", 0.0) for match in matches}
 
     retrieved_rules: list[RetrievedRule] = []
-
+    logger.info(f"RAG_node - retrieved {len(rule_ids)} matching IDs from Pinecone", rule_ids=rule_ids)
     if rule_ids:
         # 4. Fetch the full MISRA C:2023 documents from MongoDB
         mongo_docs = await get_misra_rules_by_pinecone_ids(rule_ids)
