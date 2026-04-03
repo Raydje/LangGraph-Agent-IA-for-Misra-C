@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from app.models.requests import ComplianceQueryRequest
 from app.models.responses import (
     ComplianceQueryResponse,
@@ -9,7 +9,7 @@ from app.models.responses import (
     ThreadHistoryEntry,
     ThreadHistoryResponse,
 )
-from app.api.dependencies import get_compiled_graph, get_mongo_db, get_pinecone_index
+from app.api.dependencies import get_compiled_graph, get_mongo_db, get_pinecone_index, limiter
 from app.config import get_settings
 from app.data.ingest import main as ingest
 from app.utils import logger
@@ -17,7 +17,9 @@ from app.utils import logger
 router = APIRouter()
 
 @router.get("/health", response_model=HealthResponse)
+@limiter.limit("30/minute")
 async def health_check(
+    request: Request,
     db=Depends(get_mongo_db),
     index=Depends(get_pinecone_index),
 ):
@@ -47,17 +49,19 @@ async def health_check(
     )
 
 @router.post("/query", response_model=ComplianceQueryResponse)
+@limiter.limit("5/minute")
 async def query_compliance(
-    request: ComplianceQueryRequest,
+    request: Request,
+    body: ComplianceQueryRequest,
     graph=Depends(get_compiled_graph),
 ):
     """Main endpoint to trigger the LangGraph multi-agent compliance check."""
     settings = get_settings()
     # Initialize the LangGraph State
     initial_state = {
-        "query": request.query,
-        "code_snippet": request.code_snippet or "",
-        "standard": request.standard,
+        "query": body.query,
+        "code_snippet": body.code_snippet or "",
+        "standard": body.standard,
         "iteration_count": 0,
         "max_iterations": settings.max_critique_iterations,
         "critique_history": [],
@@ -65,7 +69,7 @@ async def query_compliance(
 
     try:
         # Use caller-supplied thread_id for conversation continuity, or mint a new one
-        thread_id = request.thread_id or str(uuid.uuid4())
+        thread_id = body.thread_id or str(uuid.uuid4())
         config = {"configurable": {"thread_id": thread_id}}
         result = await graph.ainvoke(initial_state, config=config)
     except Exception as e:
@@ -74,7 +78,8 @@ async def query_compliance(
     return _build_response(thread_id, result)
 
 @router.post("/seed", response_model=IngestResponse)
-async def seed_database():
+@limiter.limit("2/minute")
+async def seed_database(request: Request):
     """Endpoint to trigger the ingestion of rules into MongoDB and Pinecone."""
     result = await ingest()
     return IngestResponse(
@@ -84,7 +89,9 @@ async def seed_database():
     )
 
 @router.post("/replay/{thread_id}/{checkpoint_id}", response_model=ComplianceQueryResponse)
+@limiter.limit("10/minute")
 async def replay_from_checkpoint(
+    request: Request,
     thread_id: str = Path(..., description="Thread ID of the session to replay"),
     checkpoint_id: str = Path(..., description="Checkpoint ID to fork execution from"),
     graph=Depends(get_compiled_graph),
@@ -118,7 +125,9 @@ async def replay_from_checkpoint(
     return _build_response(thread_id, result)
 
 @router.get("/history/{thread_id}", response_model=ThreadHistoryResponse)
+@limiter.limit("20/minute")
 async def get_thread_history(
+    request: Request,
     thread_id: str,
     graph=Depends(get_compiled_graph)
 ):

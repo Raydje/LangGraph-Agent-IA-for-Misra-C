@@ -57,6 +57,18 @@ class Settings(BaseSettings):
     # CORS
     cors_allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8501", "http://localhost:8080"]
 
+    # Redis (rate limiting)
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_user: str = "default"
+    redis_password: str = ""  # empty = no auth (safe local default)
+
+    @property
+    def redis_uri(self) -> str:
+        if self.redis_password or self.redis_user != "default":
+            return f"redis://{self.redis_user}:{self.redis_password}@{self.redis_host}:{self.redis_port}"
+        return f"redis://{self.redis_host}:{self.redis_port}"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

@@ -9,6 +9,11 @@ from app.graph.builder import build_graph
 from app.services.mongodb_service import get_mongodb_service, get_mongodb_checkpoint_service
 from app.services.pinecone_service import get_pinecone_service
 from langgraph.checkpoint.mongodb import MongoDBSaver
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.api.dependencies import limiter
+import redis as redis_sync
+from limits.storage import RedisStorage
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,6 +23,15 @@ async def lifespan(app: FastAPI):
     logger.info(f"[Startup] Gemini model: {settings.gemini_model}")
     logger.info(f"[Startup] MongoDB: ********/{settings.mongodb_database}")
     logger.info(f"[Startup] Pinecone index: {settings.pinecone_index_name}")
+
+    # Validate Redis connection (fail-fast with clear log)
+    try:
+        _r = redis_sync.from_url(settings.redis_uri, socket_connect_timeout=3)
+        _r.ping()
+        _r.close()
+        logger.info(f"[Startup] Redis connected: {settings.redis_host}:{settings.redis_port}")
+    except Exception as e:
+        logger.warning(f"[Startup] Redis unavailable — rate limiting degraded to in-memory: {e}")
 
     # app.state holds the same reference — used by route dependencies.
     app.state.mongodb = get_mongodb_service()
@@ -35,6 +49,12 @@ async def lifespan(app: FastAPI):
     app.state.mongodb.close()
     app.state.pinecone.index.close()
     app.state.mongodb_checkpoint.close()
+    try:
+        if isinstance(limiter._storage, RedisStorage):
+            limiter._storage.storage.close()
+            logger.info("[Shutdown] Redis connection closed")
+    except Exception as e:
+        logger.warning(f"[Shutdown] Redis close error")
 
 
 # Initialize FastAPI app with metadata for Swagger UI
@@ -44,6 +64,9 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
