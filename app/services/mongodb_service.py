@@ -37,9 +37,9 @@ class MongoDBService:
     async def get_rules_by_ids(self, rule_ids: list[str]) -> list[dict]:
         settings = get_settings()
         try:
-            cursor = asyncio.wait_for(self.collection.find({"rule_id": {"$in": rule_ids}}, {"_id": 0}),
-                                        timeout=settings.mongodb_timeout)
-            return await cursor.to_list(length=100)
+            cursor = self.collection.find({"rule_id": {"$in": rule_ids}}, {"_id": 0})
+            return await asyncio.wait_for(cursor.to_list(length=100)
+                                          , timeout=settings.mongodb_timeout)
         except asyncio.TimeoutError:
             logger.error("MongoDB query timed out seconds. try healthy check on MongoDB connection.", timeout=settings.mongodb_timeout)
             return []
@@ -64,7 +64,8 @@ class MongoDBService:
             return []
         try:
             cursor = self.collection.find({"$or": or_conditions}, {"_id": 0})
-            docs = await asyncio.wait_for(cursor.to_list(length=100), timeout=settings.mongodb_timeout)
+            docs = await asyncio.wait_for(cursor.to_list(length=100),
+                                          timeout=settings.mongodb_timeout)
 
             for doc in docs:
                 key = (doc.get("rule_type"), doc.get("section"), doc.get("rule_number"))
