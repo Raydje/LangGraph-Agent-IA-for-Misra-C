@@ -530,7 +530,8 @@ Every LLM-calling node tracks `prompt_tokens`, `completion_tokens`, and `total_t
 The response includes a `total_tokens_usage` object with per-node breakdowns (`orchestrator_tokens`, `validation_tokens`, `critique_tokens`, `remediation_tokens`) and an `estimated_cost` computed from Gemini's pricing table (`app/models_pricing.py`). The pricing table is injected dynamically at startup via `@model_validator(mode="after")` in `config.py` based on the configured `GEMINI_MODEL`.
 
 ---
-
+[![CI Pipeline](https://github.com/raydje/langgraph-agent-ia-for-misra-c/actions/workflows/ci.yml/badge.svg)](https://github.com/raydje/langgraph-agent-ia-for-misra-c/actions/workflows/ci.yml)
+---
 ## Setup
 
 ### 1. Clone and install
