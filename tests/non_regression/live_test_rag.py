@@ -1,4 +1,8 @@
 import asyncio
+from dotenv import load_dotenv
+
+# Ensure environment variables are loaded before importing app modules
+load_dotenv()
 
 # Import your actual code
 from app.graph.nodes.rag import rag_node

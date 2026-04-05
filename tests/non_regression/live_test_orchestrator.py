@@ -8,14 +8,7 @@ load_dotenv()
 
 # Adjust the imports based on your actual State implementation
 from app.graph.nodes.orchestrator import orchestrate
-from typing import TypedDict
-
-# Assuming ComplianceState is a TypedDict in app.models.state
-# If it's a Pydantic model, you will instantiate it differently.
-class MockComplianceState(TypedDict, total=False):
-    query: str
-    code_snippet: str
-    standard: str
+from app.models.state import ComplianceState  # noqa: F401 — used for state type hints below
 
 async def run_live_tests():
     print("==================================================")
@@ -26,7 +19,7 @@ async def run_live_tests():
     # Test Case 1: SEARCH Intent
     # ---------------------------------------------------------
     print("--- Test Case 1: SEARCH Intent ---")
-    state_search: MockComplianceState = {
+    state_search: ComplianceState = {
         "query": "What does MISRA C:2023 say about pointer arithmetic?",
         "code_snippet": "",
         "standard": "MISRA C:2023"
@@ -42,7 +35,7 @@ async def run_live_tests():
     # Test Case 2: VALIDATE Intent
     # ---------------------------------------------------------
     print("--- Test Case 2: VALIDATE Intent ---")
-    state_validate: MockComplianceState = {
+    state_validate: ComplianceState = {
         "query": "Please check this snippet and see if it complies with MISRA rules.",
         "code_snippet": """
         int divide(int a, int b) {
@@ -63,7 +56,7 @@ async def run_live_tests():
     # Test Case 3: EXPLAIN Intent
     # ---------------------------------------------------------
     print("--- Test Case 3: EXPLAIN Intent ---")
-    state_explain: MockComplianceState = {
+    state_explain: ComplianceState = {
         "query": "Explain why recursion is banned in MISRA.",
         "code_snippet": "",
         "standard": "MISRA C:2023"

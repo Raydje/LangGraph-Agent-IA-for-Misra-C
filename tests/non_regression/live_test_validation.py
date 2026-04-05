@@ -6,15 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.graph.nodes.validation import validation_node
-from typing import TypedDict, List, Dict, Any
-
-# Mock state structure to satisfy the node's type expectations
-class MockComplianceState(TypedDict, total=False):
-    query: str
-    code_snippet: str
-    retrieved_rules: List[Dict[str, Any]]
-    critique_feedback: str
-    iteration_count: int
+from app.models.state import ComplianceState  # noqa: F401 — used for state type hints below
 
 async def run_live_tests():
     print("==================================================")
@@ -25,7 +17,7 @@ async def run_live_tests():
     # Test Case 1: COMPLIANT CODE
     # ---------------------------------------------------------
     print("--- Test Case 1: Compliant Code ---")
-    state_compliant: MockComplianceState = {
+    state_compliant: ComplianceState = {
         "query": "Is this function compliant?",
         "code_snippet": "uint16_t add(uint16_t a, uint16_t b) {\n    return a + b;\n}",
         "retrieved_rules": [
@@ -51,7 +43,7 @@ async def run_live_tests():
     # Test Case 2: NON-COMPLIANT CODE (Rule Violation)
     # ---------------------------------------------------------
     print("--- Test Case 2: Non-Compliant Code ---")
-    state_violating: MockComplianceState = {
+    state_violating: ComplianceState = {
         "query": "Check this code for prototype visibility violations.",
         "code_snippet": "void do_something(void) {\n    /* doing something */\n}",
         "retrieved_rules": [
@@ -77,7 +69,7 @@ async def run_live_tests():
     # Test Case 3: CRITIQUE FEEDBACK INCORPORATION
     # ---------------------------------------------------------
     print("--- Test Case 3: Re-evaluation after Critique ---")
-    state_critique: MockComplianceState = {
+    state_critique: ComplianceState = {
         "query": "Does this cast violate MISRA?",
         "code_snippet": "int *p = (int *)0x1234;",
         "retrieved_rules": [
