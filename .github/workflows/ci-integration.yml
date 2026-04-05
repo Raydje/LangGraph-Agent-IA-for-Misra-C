@@ -44,6 +44,19 @@ jobs:
           pip install ruff
           ruff check tests/integration/ --select=E9,F63,F7,F82 --output-format=github
 
+      - name: Get runner public IP
+        id: runner_ip
+        run: echo "ip=$(curl -sf https://api.ipify.org)" >> "$GITHUB_OUTPUT"
+
+      - name: Whitelist runner IP on MongoDB Atlas
+        run: |
+          curl -sf --user "${{ secrets.MDB_PUBLIC_API_KEY }}:${{ secrets.MDB_PRIVATE_API_KEY }}" \
+               --digest \
+               --header "Content-Type: application/json" \
+               --request POST \
+               "https://cloud.mongodb.com/api/atlas/v1.0/groups/${{ secrets.MDB_ATLAS_PROJECT_ID }}/accessList" \
+               --data "[{\"ipAddress\": \"${{ steps.runner_ip.outputs.ip }}\", \"comment\": \"github-actions-runner (auto-removed)\"}]"
+
       - name: Run integration tests
         # -v           : verbose output — shows each test name + pass/skip/fail
         # --tb=short   : concise traceback on failures (keeps logs readable)
@@ -51,3 +64,13 @@ jobs:
         #                long LLM calls (the nodes have their own asyncio timeouts)
         run: |
           pytest tests/integration/ -v --tb=short -p no:timeout
+
+      - name: Remove runner IP from MongoDB Atlas whitelist
+        # always() ensures cleanup runs even when the test step fails, so the
+        # ephemeral CI IP is never left permanently open in the Atlas access list.
+        if: always()
+        run: |
+          curl -sf --user "${{ secrets.MDB_PUBLIC_API_KEY }}:${{ secrets.MDB_PRIVATE_API_KEY }}" \
+               --digest \
+               --request DELETE \
+               "https://cloud.mongodb.com/api/atlas/v1.0/groups/${{ secrets.MDB_ATLAS_PROJECT_ID }}/accessList/${{ steps.runner_ip.outputs.ip }}"
