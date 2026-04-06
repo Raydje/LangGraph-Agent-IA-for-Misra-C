@@ -16,9 +16,12 @@ from app.services.llm_service import get_llm, get_structured_llm
 # get_llm
 # ---------------------------------------------------------------------------
 
+@patch("app.services.llm_service.get_settings")
 @patch("app.services.llm_service.ChatGoogleGenerativeAI")
-def test_get_llm_instantiates_with_settings_values(mock_llm_cls):
+def test_get_llm_instantiates_with_settings_values(mock_llm_cls, mock_get_settings):
     mock_llm_cls.return_value = MagicMock()
+    mock_get_settings.return_value.gemini_api_key = "test-fake-gemini-key"
+    mock_get_settings.return_value.gemini_model = "gemini-2.5-flash"
 
     llm = get_llm(temperature=0.5, timeout=30)
 
@@ -26,8 +29,9 @@ def test_get_llm_instantiates_with_settings_values(mock_llm_cls):
     call_kwargs = mock_llm_cls.call_args[1]
     assert call_kwargs["temperature"] == 0.5
     assert call_kwargs["request_timeout"] == 30
-    # model and api_key come from settings (patched to test values by conftest)
+    # model and api_key come from patched settings
     assert call_kwargs["google_api_key"] == "test-fake-gemini-key"
+    assert call_kwargs["model"] == "gemini-2.5-flash"
 
 
 @patch("app.services.llm_service.ChatGoogleGenerativeAI")
