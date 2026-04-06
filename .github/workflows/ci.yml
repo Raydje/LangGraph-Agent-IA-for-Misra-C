@@ -225,3 +225,103 @@ jobs:
                --digest \
                --request DELETE \
                "https://cloud.mongodb.com/api/atlas/v1.0/groups/${{ secrets.MDB_ATLAS_PROJECT_ID }}/accessList/${{ steps.runner_ip.outputs.ip }}"
+
+  # ── 7. Docker Build ───────────────────────────────────────────────────────────
+  # Runs in parallel with ALL other jobs — no needs.
+  # Purpose: prove the Dockerfile builds successfully on every push and PR,
+  # as early as possible, independent of test results.
+  #
+  # Does NOT push to any registry. Instead, exports a tarball artifact that
+  # docker-push (job 8) will load and publish after all quality gates pass.
+  # This guarantees the exact same binary is published — no second build, no drift.
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          # Export as a tarball — docker-push loads this exact image, no rebuild
+          outputs: type=docker,dest=/tmp/misra-c-agent.tar
+          tags: misra-c-agent:${{ github.sha }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VERSION=${{ github.ref_name }}
+          # GHA layer cache: reuses unchanged layers across runs to cut build time
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload image tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: misra-c-agent-image-${{ github.sha }}
+          path: /tmp/misra-c-agent.tar
+          # Short retention: only needs to live long enough for docker-push to consume.
+          # Avoids unnecessary storage costs on PRs that never merge.
+          retention-days: 1
+
+  # ── 8. Docker Push ────────────────────────────────────────────────────────────
+  # Gated on ALL quality gates (unit-tests → integration) AND docker-build.
+  # Only runs on merges to main — never on PRs.
+  #
+  # Downloads the tarball produced by docker-build and pushes it to GHCR.
+  # The published image is tagged with the commit SHA for full traceability.
+  #
+  # To run E2E tests against this image:
+  #   APP_IMAGE=ghcr.io/<owner>/<repo>:<sha> docker compose up -d
+  docker-push:
+    name: Docker Push (GHCR)
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration, docker-build]
+    # Guard: only publish on merges to main, never on PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write  # required to push to GHCR
+
+    steps:
+      - name: Download image tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: misra-c-agent-image-${{ github.sha }}
+          path: /tmp
+
+      - name: Load image from tarball
+        run: docker load --input /tmp/misra-c-agent.tar
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN is built-in — no manual secret required for GHCR
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push to GHCR
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}
+          # SHA tag: immutable reference for deployments and E2E tests
+          docker tag misra-c-agent:${{ github.sha }} ${IMAGE}:${{ github.sha }}
+          # latest tag: convenience pointer, always reflects the last validated main build
+          docker tag misra-c-agent:${{ github.sha }} ${IMAGE}:latest
+          docker push ${IMAGE}:${{ github.sha }}
+          docker push ${IMAGE}:latest
+
+      - name: Output published image
+        run: |
+          echo "Published: ghcr.io/${{ github.repository }}:${{ github.sha }}"
+          echo ""
+          echo "To run the full stack locally against this exact image:"
+          echo "  APP_IMAGE=ghcr.io/${{ github.repository }}:${{ github.sha }} docker compose up -d"

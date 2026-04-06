@@ -1,34 +1,84 @@
-version: '3.8'
+# ──────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml
+#
+# CI/CD usage:
+#   Set APP_IMAGE to run the exact image built and validated by the pipeline:
+#   APP_IMAGE=ghcr.io/<owner>/<repo>:<sha> docker compose up -d
+#
+# Local dev (default):
+#   docker compose up -d
+#   (builds misra-c-agent:dev from the local Dockerfile)
+# ──────────────────────────────────────────────────────────────────────────────
 
 services:
+
+  # ── Application ─────────────────────────────────────────────────────────────
   api:
+    image: ${APP_IMAGE:-misra-c-agent:dev}
     build: .
     container_name: misra-c-agent-api
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      # Override .env default of "localhost" — inside Docker the service name is the hostname
+      REDIS_HOST: redis
     volumes:
       - ./app:/app/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       mongodb:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - app_net
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: '0.5'
+          memory: 1G
+          cpus: '1.0'
 
+  # ── Redis (rate limiting) ────────────────────────────────────────────────────
+  # To update digest: docker pull redis:7.2-alpine && docker inspect redis:7.2-alpine --format='{{index .RepoDigests 0}}'
+  redis:
+    image: redis:7.2-alpine@sha256:5f8bafd0669a697ee564ad825c2a63e6b60b0a67c02b0089f8a250051ab6fe85
+    container_name: misra-c-agent-redis
+    restart: unless-stopped
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── MongoDB (rules storage + LangGraph checkpoints) ──────────────────────────
+  # To update digest: docker pull mongo:7.0 && docker inspect mongo:7.0 --format='{{index .RepoDigests 0}}'
   mongodb:
-    image: mongo:latest
+    image: mongo:7.0@sha256:45d9c9b48aa1b56b5e3a9f906763fe432f376abb3bc2832438022b6d2534e4fe
     container_name: misra-c-agent-db
-    ports:
-      - "27017:27017"
+    # Port intentionally not exposed to host — only the api service needs it.
+    # To inspect locally: docker exec -it misra-c-agent-db mongosh
+    restart: unless-stopped
+    networks:
+      - app_net
+    volumes:
+      - mongo_data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 3s
       retries: 5
-    restart: unless-stopped
+
+# ── Named volumes ──────────────────────────────────────────────────────────────
+volumes:
+  mongo_data:
+    driver: local
+
+# ── Networks ───────────────────────────────────────────────────────────────────
+networks:
+  app_net:
+    driver: bridge

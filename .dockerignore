@@ -2,6 +2,10 @@
 .git
 .gitignore
 
+# Docker — no reason to copy build/compose config into the image layer
+Dockerfile
+docker-compose.yml
+
 # Environment & Cache
 .venv
 .env
@@ -13,11 +17,15 @@ __pycache__
 *.pyo
 *.pyd
 
+# Documentation — not needed at runtime
+*.md
+
 # Project-specific exclusions
 tests/
 test.ipynb
 bruno_collection/
-architecture-app.md
+pytest.ini
+get_all_model_available.py
 
 # Build and coverage reports
 .coverage
@@ -27,7 +35,7 @@ htmlcov/
 
 # Temporary and local data files
 temps.json
-data/*.tmp
+data/
 
 # CI/CD
 .github/
