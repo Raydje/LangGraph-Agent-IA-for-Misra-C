@@ -1,0 +1,33 @@
+# Version control
+.git
+.gitignore
+
+# Environment & Cache
+.venv
+.env
+.pytest_cache
+
+# Python artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Project-specific exclusions
+tests/
+test.ipynb
+bruno_collection/
+architecture-app.md
+
+# Build and coverage reports
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Temporary and local data files
+temps.json
+data/*.tmp
+
+# CI/CD
+.github/

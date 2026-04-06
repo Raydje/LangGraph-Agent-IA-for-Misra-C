@@ -89,9 +89,12 @@ async def query_compliance(
 async def seed_database(
     request: Request,
     principal: Principal = Security(get_current_principal, scopes=["admin:seed"]),
+    embedding_service=Depends(get_embedding_service),
+    mongo_db=Depends(get_mongodb_service),
+    pinecone_service=Depends(get_pinecone_service),
 ):
     """Endpoint to trigger the ingestion of rules into MongoDB and Pinecone."""
-    result = await ingest()
+    result = await ingest(mongodb=mongo_db, pinecone=pinecone_service, embedder=embedding_service)
     return IngestResponse(
         message="Seed data ingested successfully",
         rules_ingested=result.get("rules_ingested", 0),

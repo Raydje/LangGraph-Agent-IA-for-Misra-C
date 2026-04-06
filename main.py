@@ -7,9 +7,7 @@ from app.auth.router import auth_router
 from app.config import get_settings
 from app.utils import logger
 from app.graph.builder import build_graph
-from app.services.mongodb_service import MongoDBService,  MongoDBCheckpointService
-from app.services.pinecone_service import PineconeService
-from app.services.embedding_service import EmbeddingService
+from app.services.service_container import create_service_container
 from langgraph.checkpoint.mongodb import MongoDBSaver
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -35,30 +33,29 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("[Startup] Redis unavailable — rate limiting degraded to in-memory", error=str(e))
 
-    # app.state holds the same reference — used by route dependencies.
-    app.state.mongodb = MongoDBService()
-    app.state.pinecone = PineconeService()
-    app.state.mongodb_checkpoint = MongoDBCheckpointService()
-    app.state.embedding = EmbeddingService()
+    # Delegate service instantiation and cleanup to the centralised container.
+    # app.state holds the same references — used by route dependencies.
+    async with create_service_container() as container:
+        app.state.mongodb = container.mongodb
+        app.state.pinecone = container.pinecone
+        app.state.mongodb_checkpoint = container.mongodb_checkpoint
+        app.state.embedding = container.embedding
 
-    checkpointer = MongoDBSaver(app.state.mongodb_checkpoint.client,
-                                db_name=app.state.mongodb_checkpoint.db.name,
-                                collection=app.state.mongodb_checkpoint.collection.name)
-    app.state.graph = await build_graph(checkpointer=checkpointer)
+        checkpointer = MongoDBSaver(container.mongodb_checkpoint.client,
+                                    db_name=container.mongodb_checkpoint.db.name,
+                                    collection=container.mongodb_checkpoint.collection.name)
+        app.state.graph = await build_graph(checkpointer=checkpointer)
 
-    # Create auth indexes (idempotent — safe to call on every restart)
-    auth_db = app.state.mongodb.db
-    await auth_db["users"].create_index("email", unique=True)
-    await auth_db["api_keys"].create_index("key_id")
-    await auth_db["api_keys"].create_index("user_id")
-    logger.info("[Startup] Auth indexes ensured (users.email, api_keys.key_id, api_keys.user_id)")
+        # Create auth indexes (idempotent — safe to call on every restart)
+        auth_db = container.mongodb.db
+        await auth_db["users"].create_index("email", unique=True)
+        await auth_db["api_keys"].create_index("key_id")
+        await auth_db["api_keys"].create_index("user_id")
+        logger.info("[Startup] Auth indexes ensured (users.email, api_keys.key_id, api_keys.user_id)")
 
-    yield
+        yield
 
-    # --- Shutdown ---
-    app.state.mongodb.close()
-    app.state.pinecone.index.close()
-    app.state.mongodb_checkpoint.close()
+    # --- Shutdown (container finally block closes all service connections) ---
     try:
         if isinstance(limiter._storage, RedisStorage):
             limiter._storage.storage.close()

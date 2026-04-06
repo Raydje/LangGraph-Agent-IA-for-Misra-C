@@ -42,7 +42,6 @@ MyProjectCv/
 │   │   └── dependencies.py       # Graph + DB dependencies (lru_cache)
 │   │
 │   └── data/
-│       ├── seed_rules.py         # Legacy DO-178B rules (unused)
 │       └── ingest.py             # MISRA ingestion → MongoDB + Pinecone
 │
 ├── data/

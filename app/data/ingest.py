@@ -16,6 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from app.services.embedding_service import EmbeddingService
 from app.services.mongodb_service import MongoDBService
+from app.services.pinecone_service import PineconeService
+from app.services.service_container import create_service_container
 from app.utils import logger
 
 
@@ -88,15 +90,18 @@ def parse_misra_file(filepath: str) -> list[dict]:
     return rules
 
 
-async def upload_to_mongodb(rules: list[dict]):
+async def upload_to_mongodb(rules: list[dict], svc: MongoDBService):
     """Uploads parsed rules to MongoDB asynchronously."""
     if not rules:
         logger.warning("No rules to upload.")
         return
 
     logger.info("Connecting to MongoDB Atlas...")
-    svc = MongoDBService()
-    await svc.create_indexes()
+    try:
+        await svc.create_indexes()
+    except Exception as e:
+        logger.error("Error creating indexes in MongoDB")
+        return
 
     logger.info("Preparing to insert/update rules...", number_of_rules=len(rules))
 
@@ -111,7 +116,7 @@ async def upload_to_mongodb(rules: list[dict]):
         logger.info("   - Inserted:", number_inserted=result.upserted_count)
         logger.info("   - Modified:", number_modified=result.modified_count)
 
-async def main() -> dict:
+async def main(mongodb: MongoDBService, pinecone: PineconeService, embedder: EmbeddingService) -> dict:
     # Test the parser
     target_file = "data/misra_c_2023__headlines_for_cppcheck.txt"
     parsed_rules = parse_misra_file(target_file)
@@ -127,17 +132,26 @@ async def main() -> dict:
 
         # Now upload to MongoDB
         logger.info("2. Uploading to MongoDB...")
-        await upload_to_mongodb(parsed_rules)
+        await upload_to_mongodb(parsed_rules, mongodb)
 
         logger.info("3. Uploading to Pinecone...")
-        embedder = EmbeddingService()
         # Add 'await' here!
-        vectors_upserted = await embedder.embed_and_store(parsed_rules)
+        vectors_upserted = await embedder.embed_and_store(parsed_rules, pinecone)
 
         return {"rules_ingested": len(parsed_rules), "vectors_upserted": vectors_upserted}
 
     return {"rules_ingested": 0, "vectors_upserted": 0}
-        
+
+
+async def run_ingest_cli() -> None:
+    """CLI entry point — manages service lifecycle via the centralised container."""
+    async with create_service_container() as container:
+        result = await main(
+            mongodb=container.mongodb,
+            pinecone=container.pinecone,
+            embedder=container.embedding,
+        )
+        logger.info("Ingestion complete", **result)
+
 if __name__ == "__main__":
-    # Run the async main function
-    asyncio.run(main())        
+    asyncio.run(run_ingest_cli())

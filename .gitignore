@@ -75,3 +75,9 @@ desktop.ini
 # Misc
 *.tmp
 *.bak
+
+# test module files
+.mypycache__/
+.pytest_cache__/
+__pycache__/
+.ruff_cache/
