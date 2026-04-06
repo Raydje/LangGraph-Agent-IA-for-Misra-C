@@ -227,3 +227,25 @@ async def test_empty_query_string_is_handled():
 
     assert result["rag_query_used"] == ""
     assert result["retrieved_rules"] == []
+
+
+# ---------------------------------------------------------------------------
+# None-guard tests (lines 22-27)
+# ---------------------------------------------------------------------------
+
+async def test_raises_value_error_if_embedding_service_is_none():
+    config = {"configurable": {"embedding_service": None, "pinecone_service": MagicMock(), "mongo_db": MagicMock()}}
+    with pytest.raises(ValueError, match="embedding_service is not configured"):
+        await rag_node(_make_state(), config)
+
+
+async def test_raises_value_error_if_pinecone_service_is_none():
+    config = {"configurable": {"embedding_service": MagicMock(), "pinecone_service": None, "mongo_db": MagicMock()}}
+    with pytest.raises(ValueError, match="pinecone_service is not configured"):
+        await rag_node(_make_state(), config)
+
+
+async def test_raises_value_error_if_mongo_db_is_none():
+    config = {"configurable": {"embedding_service": MagicMock(), "pinecone_service": MagicMock(), "mongo_db": None}}
+    with pytest.raises(ValueError, match="mongo_db is not configured"):
+        await rag_node(_make_state(), config)

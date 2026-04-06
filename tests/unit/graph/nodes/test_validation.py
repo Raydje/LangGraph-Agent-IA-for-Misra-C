@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, AsyncMock, patch
+import asyncio
 from app.graph.nodes.validation import validation_node, ValidationOutput
 
 
@@ -129,3 +130,16 @@ async def test_token_counts_propagated():
     assert result["completion_tokens"] == 50
     assert result["total_tokens"] == 150
     assert result["validation_tokens"] == 150
+
+
+async def test_timeout_returns_not_compliant_and_zero_tokens():
+    """asyncio.TimeoutError during LLM call → is_compliant False, all tokens zero."""
+    with patch("app.graph.nodes.validation.get_structured_llm", return_value=_mock_structured_llm(VALID_OUTPUT)), \
+         patch("app.graph.nodes.validation.asyncio.wait_for", side_effect=asyncio.TimeoutError):
+        result = await validation_node(_base_state())
+
+    assert result["is_compliant"] is False
+    assert "timed out" in result["validation_result"].lower()
+    assert result["confidence_score"] == 0.0
+    assert result["cited_rules"] == []
+    assert result["estimated_cost"] == 0.0

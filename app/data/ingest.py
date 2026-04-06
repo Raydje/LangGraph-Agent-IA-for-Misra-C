@@ -153,5 +153,5 @@ async def run_ingest_cli() -> None:
         )
         logger.info("Ingestion complete", **result)
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     asyncio.run(run_ingest_cli())

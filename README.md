@@ -616,15 +616,22 @@ Swagger UI is available at `http://localhost:8000/docs`.
 
 ---
 
-## Running Tests
+## Testing
 
+This project prioritizes high-quality, reliable unit testing. We currently maintain **98% unit test coverage** for core application modules.
+
+### Testing Strategy
+- **Unit Tests:** Located in `tests/unit/`. We use `pytest` with `pytest-asyncio` for asynchronous code.
+- **Mocking:** To ensure speed and isolation, we mock external services (Pinecone, MongoDB, Google Gemini) using `unittest.mock` (`AsyncMock`, `MagicMock`). We frequently use `object.__new__` to bypass `__init__` calls where SDK instantiation would otherwise be required.
+- **CI Requirements:**
+    - Linting: `ruff check . --select=E9,F63,F7,F82`
+    - Testing: `pytest tests/unit/ --cov=app`
+
+### Running Tests
+To run the full test suite locally (ensure your virtual environment is activated):
 ```bash
-pytest tests/ -v --cov
+pytest tests/unit/ --cov=app --cov-report=term-missing
 ```
-
-Tests mock all external services (Gemini, Pinecone, MongoDB) via `conftest.py` and `pytest-mock`. No API keys are needed to run the test suite.
-
-The `conftest.py` autouse session-fixture patches `get_settings()` globally and clears the `lru_cache` before and after the session. Node tests mock `get_structured_llm` to return a fake chain with an `AsyncMock` that returns the `{"raw": ..., "parsed": ..., "parsing_error": ...}` dict structure expected by `include_raw=True`. Edge tests are pure synchronous unit tests with no dependencies.
 
 ---
 

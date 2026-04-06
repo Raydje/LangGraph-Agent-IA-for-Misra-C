@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, AsyncMock, patch
+import asyncio
 from app.graph.nodes.orchestrator import orchestrate, OrchestratorOutput
 
 
@@ -116,3 +117,33 @@ async def test_get_structured_llm_called_with_orchestrator_output_schema():
 
     mock_get_structured_llm.assert_called_once()
     assert mock_get_structured_llm.call_args[0][0] == OrchestratorOutput
+
+
+async def test_timeout_returns_default_search_intent():
+    """asyncio.TimeoutError during chain.ainvoke → default 'search' response with zeros."""
+    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
+         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template, \
+         patch("app.graph.nodes.orchestrator.asyncio.wait_for", side_effect=asyncio.TimeoutError):
+        _setup_mocks(mock_get_structured_llm, mock_template, "search", "r")
+        result = await orchestrate({"query": "q", "code_snippet": ""})
+
+    assert result["intent"] == "search"
+    assert "timed out" in result["orchestrator_reasoning"].lower()
+    assert result["prompt_tokens"] == 0
+    assert result["total_tokens"] == 0
+    assert result["estimated_cost"] == 0.0
+
+
+async def test_parse_failure_returns_default_search_intent():
+    """When chain returns {'parsed': None}, the ValueError path returns search defaults."""
+    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
+         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template:
+        chain = _setup_mocks(mock_get_structured_llm, mock_template, "search", "r")
+        # Override ainvoke to return a result with parsed=None
+        chain.ainvoke = AsyncMock(return_value={"parsed": None, "raw": MagicMock()})
+        result = await orchestrate({"query": "q", "code_snippet": ""})
+
+    assert result["intent"] == "search"
+    assert "failed" in result["orchestrator_reasoning"].lower()
+    assert result["prompt_tokens"] == 0
+    assert result["estimated_cost"] == 0.0

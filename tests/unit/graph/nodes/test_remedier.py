@@ -1,5 +1,6 @@
 # tests/unit/graph/nodes/test_remedier.py
 
+import asyncio
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
@@ -232,4 +233,21 @@ async def test_human_message_contains_validation_result(mock_get_structured_llm)
 
     messages = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
     assert validation in messages[1].content
+
+
+@patch("app.graph.nodes.remedier.get_structured_llm")
+async def test_timeout_returns_original_code_and_zero_tokens(mock_get_structured_llm):
+    """asyncio.TimeoutError during LLM call → original code returned, all tokens zero."""
+    mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
+
+    code = "int x = 1;"
+    with patch("app.graph.nodes.remedier.asyncio.wait_for", side_effect=asyncio.TimeoutError):
+        result = await remediate_code(_make_state(code_snippet=code))
+
+    assert result["fixed_code_snippet"] == code
+    assert "timed out" in result["remediation_explanation"].lower()
+    assert result["prompt_tokens"] == 0
+    assert result["completion_tokens"] == 0
+    assert result["total_tokens"] == 0
+    assert result["estimated_cost"] == 0.0
 

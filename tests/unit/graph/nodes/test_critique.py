@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, AsyncMock, patch
+import asyncio
 from app.graph.nodes.critique import critique_node, CritiqueOutput
 
 
@@ -123,3 +124,16 @@ async def test_critique_history_populated_on_rejection():
     entry = result["critique_history"][0]
     assert entry["approved"] is False
     assert "Rule hallucination detected." in entry["issues_found"]
+
+
+async def test_timeout_sets_critique_approved_false():
+    """asyncio.TimeoutError during structured LLM call → critique_approved False, zero tokens."""
+    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(None)), \
+         patch("app.graph.nodes.critique.asyncio.wait_for", side_effect=asyncio.TimeoutError):
+        result = await critique_node(_base_state())
+
+    assert result["critique_approved"] is False
+    assert "timed out" in result["critique_feedback"].lower()
+    assert result["prompt_tokens"] == 0
+    assert result["total_tokens"] == 0
+    assert result["estimated_cost"] == 0.0
