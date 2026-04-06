@@ -309,9 +309,11 @@ jobs:
           # GITHUB_TOKEN is built-in — no manual secret required for GHCR
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase image name
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
       - name: Tag and push to GHCR
         run: |
-          IMAGE=ghcr.io/${{ github.repository }}
           # SHA tag: immutable reference for deployments and E2E tests
           docker tag misra-c-agent:${{ github.sha }} ${IMAGE}:${{ github.sha }}
           # latest tag: convenience pointer, always reflects the last validated main build
@@ -321,7 +323,7 @@ jobs:
 
       - name: Output published image
         run: |
-          echo "Published: ghcr.io/${{ github.repository }}:${{ github.sha }}"
+          echo "Published: ${IMAGE}:${{ github.sha }}"
           echo ""
           echo "To run the full stack locally against this exact image:"
-          echo "  APP_IMAGE=ghcr.io/${{ github.repository }}:${{ github.sha }} docker compose up -d"
+          echo "  APP_IMAGE=${IMAGE}:${{ github.sha }} docker compose up -d"
