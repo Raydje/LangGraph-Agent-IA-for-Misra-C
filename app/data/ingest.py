@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from app.services.embedding_service import EmbeddingService
 from app.services.mongodb_service import MongoDBService
 from app.services.pinecone_service import PineconeService
+from app.services.service_container import create_service_container
 from app.utils import logger
 
 
@@ -140,7 +141,17 @@ async def main(mongodb: MongoDBService, pinecone: PineconeService, embedder: Emb
         return {"rules_ingested": len(parsed_rules), "vectors_upserted": vectors_upserted}
 
     return {"rules_ingested": 0, "vectors_upserted": 0}
-        
+
+
+async def run_ingest_cli() -> None:
+    """CLI entry point — manages service lifecycle via the centralised container."""
+    async with create_service_container() as container:
+        result = await main(
+            mongodb=container.mongodb,
+            pinecone=container.pinecone,
+            embedder=container.embedding,
+        )
+        logger.info("Ingestion complete", **result)
+
 if __name__ == "__main__":
-    # Run the async main function
-    asyncio.run(main())        
+    asyncio.run(run_ingest_cli())

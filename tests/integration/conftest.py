@@ -2,9 +2,8 @@
 Integration test configuration.
 
 Provides session-scoped, real service fixtures for the integration test suite.
-These fixtures replicate the lifespan startup from main.py — initialising the
-same singletons (MongoDBService, PineconeService, EmbeddingService) once per
-test session and tearing them down cleanly afterwards.
+All services are created and torn down through the canonical ServiceContainer,
+which is the same code path used by main.py's lifespan context manager.
 
 Design principles
 -----------------
@@ -20,6 +19,9 @@ Design principles
   test path hierarchy, not from sibling directories.
   When both suites must run together, the real secrets must be present first so
   setdefault does not replace them with dummy values.
+- Individual service fixtures (mongodb_service, pinecone_service,
+  embedding_service) are kept as thin delegates so that existing integration
+  tests need no changes.
 """
 
 import os
@@ -77,14 +79,11 @@ def pytest_collection_modifyitems(items: list, config: object) -> None:  # noqa:
 # Import after the guard so that Settings() is never constructed with dummies
 # on a cache miss if the cache was already primed by the unit conftest.
 from app.config import get_settings  # noqa: E402
-from app.services.embedding_service import EmbeddingService  # noqa: E402
-from app.services.mongodb_service import MongoDBService  # noqa: E402
-from app.services.pinecone_service import PineconeService  # noqa: E402
+from app.services.service_container import ServiceContainer, create_service_container  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
 # Session-scoped service fixtures
-# Mirrors the startup block in main.py's lifespan context manager.
 # ---------------------------------------------------------------------------
 
 
@@ -99,43 +98,46 @@ def real_settings():
 
 
 @pytest.fixture(scope="session")
-async def mongodb_service(real_settings):  # noqa: ARG001
+async def service_container(real_settings) -> ServiceContainer:  # noqa: ARG001
     """
-    Provide a live MongoDBService instance, shared across the entire session.
+    Create all infrastructure services once per session via the canonical
+    ServiceContainer factory — the same code path used in main.py's lifespan.
 
-    Declared as async so Motor's AsyncIOMotorClient is bound to the
-    session-scoped event loop provided by the event_loop fixture above.
-    Motor establishes its connection lazily on the first query, matching
-    the behaviour in main.py's lifespan context manager.
+    Lifecycle guarantees (startup and teardown) are owned entirely by
+    create_service_container(), so this fixture is the single source of truth
+    for connection management across integration tests.
     """
-    service = MongoDBService()
-    yield service
-    service.close()
+    async with create_service_container() as container:
+        yield container
+
+
+# ---------------------------------------------------------------------------
+# Per-service delegate fixtures
+# Thin wrappers around service_container so that existing integration tests
+# can request individual services without any changes.
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
-async def pinecone_service(real_settings):  # noqa: ARG001
-    """Provide a live PineconeService instance, shared across the entire session."""
-    service = PineconeService()
-    yield service
-    # PineconeService has no explicit close method — the HTTP client is managed
-    # internally by the Pinecone SDK and cleaned up by the GC.
+def mongodb_service(service_container: ServiceContainer):
+    """Delegate to service_container.mongodb."""
+    return service_container.mongodb
 
 
 @pytest.fixture(scope="session")
-async def embedding_service(real_settings):  # noqa: ARG001
-    """
-    Provide a live EmbeddingService instance, shared across the entire session.
-
-    Declared as async so the internal httpx client inside
-    GoogleGenerativeAIEmbeddings is bound to the session-scoped event loop.
-    """
-    service = EmbeddingService()
-    yield service
+def pinecone_service(service_container: ServiceContainer):
+    """Delegate to service_container.pinecone."""
+    return service_container.pinecone
 
 
 @pytest.fixture(scope="session")
-async def rag_config(mongodb_service, pinecone_service, embedding_service):
+def embedding_service(service_container: ServiceContainer):
+    """Delegate to service_container.embedding."""
+    return service_container.embedding
+
+
+@pytest.fixture(scope="session")
+def rag_config(mongodb_service, pinecone_service, embedding_service):
     """
     Build the LangGraph RunnableConfig dict expected by rag_node.
 

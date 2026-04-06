@@ -18,3 +18,16 @@ tests/
 test.ipynb
 bruno_collection/
 architecture-app.md
+
+# Build and coverage reports
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Temporary and local data files
+temps.json
+data/*.tmp
+
+# CI/CD
+.github/
