@@ -1,6 +1,7 @@
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.config import get_settings
 from app.services.mongodb_service import MongoDBService, MongoDBCheckpointService
 from app.services.pinecone_service import PineconeService
@@ -52,7 +53,7 @@ except Exception:
 def get_compiled_graph(request: Request):
     return request.app.state.graph
 
-def get_mongodb_database(request: Request) -> MongoDBService:
+def get_mongodb_database(request: Request) -> AsyncIOMotorDatabase:
     return request.app.state.mongodb.db
 
 def get_pinecone_index(request: Request):
