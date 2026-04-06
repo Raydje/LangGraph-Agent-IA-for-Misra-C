@@ -51,11 +51,12 @@ async def rag_node(state: ComplianceState, config: RunnableConfig) -> dict[str, 
     scores_map = {match["id"]: match.get("score", 0.0) for match in matches}
 
     retrieved_rules: list[RetrievedRule] = []
-    logger.info("RAG_node - retrieved {len(rule_ids)} matching IDs from Pinecone", rule_ids=rule_ids)
+    logger.info("RAG_node - Pinecone query completed", number_of_matches=len(matches))
+    logger.info("RAG_node - retrieved  matching IDs from Pinecone", rule_ids=rule_ids)
     if rule_ids:
         # 4. Fetch the full documents from MongoDB
         mongo_docs = await mongo_db.get_misra_rules_by_pinecone_ids(rule_ids)
-        logger.info("RAG_node - retrieved {len(mongo_docs)} documents from MongoDB based on Pinecone IDs", number_of_documents=len(mongo_docs))
+        logger.info("RAG_node - retrieved  documents from MongoDB based on Pinecone IDs", number_of_documents=len(mongo_docs))
         # 5. Format the documents into the TypedDict expected by LangGraph
         for doc in mongo_docs:
             r_id = doc.get("rule_id", "")

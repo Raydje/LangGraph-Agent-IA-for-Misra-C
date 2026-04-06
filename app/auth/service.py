@@ -8,8 +8,6 @@ Rules:
 """
 from __future__ import annotations
 
-import base64
-import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -19,22 +17,16 @@ from jose import jwt
 from app.config import get_settings
 
 
-def _prehash(plaintext: str) -> bytes:
-    """SHA-256 pre-hash to avoid bcrypt's 72-byte truncation limit."""
-    digest = hashlib.sha256(plaintext.encode("utf-8")).digest()
-    return base64.b64encode(digest)  # 44 ASCII bytes — well under 72
-
-
 # ---------------------------------------------------------------------------
 # Passwords
 # ---------------------------------------------------------------------------
 
 def hash_password(plaintext: str) -> str:
-    return bcrypt.hashpw(_prehash(plaintext), bcrypt.gensalt()).decode("utf-8")
+    return bcrypt.hashpw(plaintext.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plaintext: str, hashed: str) -> bool:
-    return bcrypt.checkpw(_prehash(plaintext), hashed.encode("utf-8"))
+    return bcrypt.checkpw(plaintext.encode("utf-8"), hashed.encode("utf-8"))
 
 
 # ---------------------------------------------------------------------------
