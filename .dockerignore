@@ -1,0 +1,20 @@
+# Version control
+.git
+.gitignore
+
+# Environment & Cache
+.venv
+.env
+.pytest_cache
+
+# Python artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Project-specific exclusions
+tests/
+test.ipynb
+bruno_collection/
+architecture-app.md

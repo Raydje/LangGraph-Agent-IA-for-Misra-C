@@ -17,7 +17,7 @@ class EmbeddingService:
     async def get_embedding(self, text: str) -> list[float]:
         return await self.embeddings.aembed_query(text)
 
-    async def embed_and_store(self, rules: list[dict]) -> int:
+    async def embed_and_store(self, rules: list[dict], pinecone_service: PineconeService) -> int:
         if not rules:
             return 0
 
@@ -50,6 +50,6 @@ class EmbeddingService:
             })
 
         logger.info("Delegating upload to pinecone_service...")
-        upserted = await PineconeService().upsert_vectors(vectors)
+        upserted = await pinecone_service.upsert_vectors(vectors)
         logger.info("✅ Successfully passed embeddings to Pinecone!", number_of_embeddings=len(vectors))
         return upserted
