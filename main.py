@@ -1,21 +1,24 @@
 from contextlib import asynccontextmanager
+
+import redis as redis_sync
+import redis.asyncio as redis_async
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
+from langgraph.checkpoint.mongodb import MongoDBSaver
+from limits.storage import RedisStorage
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from app.api.dependencies import limiter
 from app.api.v1.routes import router
 from app.auth.router import auth_router
 from app.config import get_settings
-from app.utils import logger
 from app.graph.builder import build_graph
 from app.services.service_container import create_service_container
 from app.services.usage_service import UsageService
-from langgraph.checkpoint.mongodb import MongoDBSaver
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from app.api.dependencies import limiter
-import redis as redis_sync
-import redis.asyncio as redis_async
-from limits.storage import RedisStorage
+from app.utils import logger
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,7 +27,12 @@ async def lifespan(app: FastAPI):
     logger.info("[Startup] Loaded config for standard: MISRA C:2023")
     logger.info("[Startup] Gemini model", model_name=settings.gemini_model)
     logger.info("[Startup] MongoDB", database=settings.mongodb_database)
-    logger.info("[Startup] Pinecone index", index_name=settings.pinecone_index_name, cloud=settings.pinecone_cloud, region=settings.pinecone_region)
+    logger.info(
+        "[Startup] Pinecone index",
+        index_name=settings.pinecone_index_name,
+        cloud=settings.pinecone_cloud,
+        region=settings.pinecone_region,
+    )
 
     # Validate Redis connection (fail-fast with clear log) and create async client
     redis_client = None
@@ -52,9 +60,11 @@ async def lifespan(app: FastAPI):
         app.state.mongodb_checkpoint = container.mongodb_checkpoint
         app.state.embedding = container.embedding
 
-        checkpointer = MongoDBSaver(container.mongodb_checkpoint.client,
-                                    db_name=container.mongodb_checkpoint.db.name,
-                                    collection=container.mongodb_checkpoint.collection.name)
+        checkpointer = MongoDBSaver(
+            container.mongodb_checkpoint.client,
+            db_name=container.mongodb_checkpoint.db.name,
+            collection=container.mongodb_checkpoint.collection.name,
+        )
         app.state.graph = await build_graph(checkpointer=checkpointer)
 
         # Create auth indexes (idempotent — safe to call on every restart)
@@ -106,6 +116,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/", include_in_schema=False)
 async def root():
     return RedirectResponse(url="/docs")
@@ -121,11 +132,16 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.error("Unhandled exception on", exc_info=True, request=request.method, request_url=request.url.path, exc=exc  )
+    logger.error("Unhandled exception on", exc_info=True, request=request.method, request_url=request.url.path, exc=exc)
     return JSONResponse(
         status_code=500,
-        content={"status_code": 500, "error": "InternalServerError", "detail": "An unexpected internal server error occurred."},
+        content={
+            "status_code": 500,
+            "error": "InternalServerError",
+            "detail": "An unexpected internal server error occurred.",
+        },
     )
+
 
 # Include the routes defined in routes.py
 app.include_router(router, prefix="/api/v1")

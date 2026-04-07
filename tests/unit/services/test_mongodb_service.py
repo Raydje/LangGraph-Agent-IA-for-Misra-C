@@ -1,12 +1,14 @@
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
-from pymongo.errors import PyMongoError
-from app.services.mongodb_service import MongoDBService, MongoDBCheckpointService
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from pymongo.errors import PyMongoError
+
+from app.services.mongodb_service import MongoDBCheckpointService, MongoDBService
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_mock_collection(docs: list[dict]) -> MagicMock:
     """Return a Motor collection mock whose find().to_list() returns docs."""
@@ -27,6 +29,7 @@ def _make_service(docs: list[dict]) -> MongoDBService:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_valid_ids_return_annotated_docs():
@@ -130,6 +133,7 @@ async def test_excludes_id_field_from_projection():
 # MongoDBCheckpointService.__init__ and close
 # ---------------------------------------------------------------------------
 
+
 def test_checkpoint_service_init_stores_client_db_collection():
     mock_settings = MagicMock()
     mock_settings.mongodb_uri = "mongodb://localhost:27017"
@@ -142,8 +146,10 @@ def test_checkpoint_service_init_stores_client_db_collection():
     mock_client.__getitem__ = MagicMock(return_value=mock_db)
     mock_db.__getitem__ = MagicMock(return_value=mock_collection)
 
-    with patch("app.services.mongodb_service.get_settings", return_value=mock_settings), \
-         patch("app.services.mongodb_service.MongoClient", return_value=mock_client):
+    with (
+        patch("app.services.mongodb_service.get_settings", return_value=mock_settings),
+        patch("app.services.mongodb_service.MongoClient", return_value=mock_client),
+    ):
         svc = MongoDBCheckpointService()
 
     assert svc.client is mock_client
@@ -162,6 +168,7 @@ def test_checkpoint_service_close_calls_client_close():
 # MongoDBService.__init__ and close
 # ---------------------------------------------------------------------------
 
+
 def test_mongodb_service_init_stores_client_db_collection():
     mock_settings = MagicMock()
     mock_settings.mongodb_uri = "mongodb://localhost:27017"
@@ -175,8 +182,10 @@ def test_mongodb_service_init_stores_client_db_collection():
     mock_client.__getitem__ = MagicMock(return_value=mock_db)
     mock_db.__getitem__ = MagicMock(return_value=mock_collection)
 
-    with patch("app.services.mongodb_service.get_settings", return_value=mock_settings), \
-         patch("app.services.mongodb_service.AsyncIOMotorClient", return_value=mock_client) as mock_motor:
+    with (
+        patch("app.services.mongodb_service.get_settings", return_value=mock_settings),
+        patch("app.services.mongodb_service.AsyncIOMotorClient", return_value=mock_client) as mock_motor,
+    ):
         svc = MongoDBService()
 
     mock_motor.assert_called_once_with(
@@ -199,6 +208,7 @@ def test_mongodb_service_close_calls_client_close():
 # MongoDBService.get_rules_by_ids
 # ---------------------------------------------------------------------------
 
+
 async def test_get_rules_by_ids_happy_path():
     docs = [{"rule_id": "MISRA_RULE_1.1", "title": "No dead code"}]
     svc = object.__new__(MongoDBService)
@@ -207,9 +217,7 @@ async def test_get_rules_by_ids_happy_path():
     result = await svc.get_rules_by_ids(["MISRA_RULE_1.1"])
 
     assert result == docs
-    svc.collection.find.assert_called_once_with(
-        {"rule_id": {"$in": ["MISRA_RULE_1.1"]}}, {"_id": 0}
-    )
+    svc.collection.find.assert_called_once_with({"rule_id": {"$in": ["MISRA_RULE_1.1"]}}, {"_id": 0})
 
 
 async def test_get_rules_by_ids_pymongo_error_returns_empty():
@@ -229,6 +237,7 @@ async def test_get_rules_by_ids_pymongo_error_returns_empty():
 # MongoDBService.get_misra_rules_by_pinecone_ids — PyMongoError branch
 # ---------------------------------------------------------------------------
 
+
 async def test_get_misra_rules_by_pinecone_ids_pymongo_error_returns_empty():
     svc = object.__new__(MongoDBService)
     coll = MagicMock()
@@ -245,6 +254,7 @@ async def test_get_misra_rules_by_pinecone_ids_pymongo_error_returns_empty():
 # ---------------------------------------------------------------------------
 # MongoDBService.get_rules_by_metadata
 # ---------------------------------------------------------------------------
+
 
 async def test_get_rules_by_metadata_happy_path():
     docs = [{"section": 3, "rule_number": 4, "title": "Rule 3.4"}]
@@ -274,6 +284,7 @@ async def test_get_rules_by_metadata_pymongo_error_returns_empty():
 # MongoDBService.insert_rules
 # ---------------------------------------------------------------------------
 
+
 async def test_insert_rules_calls_insert_many_when_non_empty():
     svc = object.__new__(MongoDBService)
     svc.collection = MagicMock()
@@ -298,6 +309,7 @@ async def test_insert_rules_skips_insert_when_empty():
 # ---------------------------------------------------------------------------
 # MongoDBService.create_indexes
 # ---------------------------------------------------------------------------
+
 
 async def test_create_indexes_drops_old_index_then_creates_new():
     svc = object.__new__(MongoDBService)

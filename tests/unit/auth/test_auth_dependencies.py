@@ -5,10 +5,11 @@ Unit tests for app/auth/dependencies.py.
 All DB interactions are replaced by AsyncMock; JWT creation uses real
 tokens so we test the actual decode path.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -18,10 +19,10 @@ from app.auth.dependencies import _build_401, _resolve_jwt, get_current_principa
 from app.auth.models import Principal
 from app.auth.service import create_access_token, create_refresh_token
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_request(db_coro_side_effect=None, key_doc=None, user_doc=None) -> MagicMock:
     """Fabricate a minimal FastAPI Request mock whose app.state.mongodb.db is a mock."""
@@ -59,6 +60,7 @@ def _with_scopes(*scopes: str) -> SecurityScopes:
 # _resolve_jwt — happy path
 # ---------------------------------------------------------------------------
 
+
 def test_resolve_jwt_happy_path_returns_principal():
     token = _valid_access_token("user-99", "user@example.com", ["query:read"])
     principal = _resolve_jwt(token)
@@ -77,6 +79,7 @@ def test_resolve_jwt_scopes_propagated():
 # ---------------------------------------------------------------------------
 # _resolve_jwt — error paths
 # ---------------------------------------------------------------------------
+
 
 def test_resolve_jwt_invalid_token_raises_401():
     with pytest.raises(HTTPException) as exc_info:
@@ -97,6 +100,7 @@ def test_resolve_jwt_refresh_token_rejected():
 # get_current_principal — no token
 # ---------------------------------------------------------------------------
 
+
 async def test_get_current_principal_no_token_raises_401():
     request = _make_request()
     with pytest.raises(HTTPException) as exc_info:
@@ -108,6 +112,7 @@ async def test_get_current_principal_no_token_raises_401():
 # get_current_principal — JWT path dispatch
 # ---------------------------------------------------------------------------
 
+
 async def test_get_current_principal_dispatches_jwt_for_bearer_token():
     token = _valid_access_token()
     request = _make_request()
@@ -118,6 +123,7 @@ async def test_get_current_principal_dispatches_jwt_for_bearer_token():
 # ---------------------------------------------------------------------------
 # get_current_principal — API key path dispatch
 # ---------------------------------------------------------------------------
+
 
 async def test_get_current_principal_dispatches_api_key_for_ak_prefix():
     from app.auth.service import generate_api_key
@@ -153,6 +159,7 @@ async def test_get_current_principal_dispatches_api_key_for_ak_prefix():
 # Scope enforcement
 # ---------------------------------------------------------------------------
 
+
 async def test_scope_enforcement_missing_scope_raises_403():
     token = _valid_access_token(scopes=["query:read"])
     request = _make_request()
@@ -180,6 +187,7 @@ async def test_scope_enforcement_exact_scope_passes():
 # API key error paths
 # ---------------------------------------------------------------------------
 
+
 async def test_resolve_api_key_malformed_key_raises_401():
     request = _make_request()
     with pytest.raises(HTTPException) as exc_info:
@@ -193,6 +201,7 @@ async def test_resolve_api_key_not_found_in_db_raises_401():
     request = _make_request(key_doc=None)
     # Generate a valid-format key so parse_api_key won't fail
     from app.auth.service import generate_api_key
+
     full_key, _, _ = generate_api_key()
     # Override api_keys find_one to always return None
     request.app.state.mongodb.db["api_keys"].find_one = AsyncMock(return_value=None)
@@ -203,6 +212,7 @@ async def test_resolve_api_key_not_found_in_db_raises_401():
 
 async def test_resolve_api_key_expired_raises_401():
     from app.auth.service import generate_api_key
+
     full_key, key_id, key_hash = generate_api_key()
     # expires_at is in the past (naive datetime — service makes it aware)
     expired_at = datetime(2000, 1, 1)
@@ -224,6 +234,7 @@ async def test_resolve_api_key_expired_raises_401():
 
 async def test_resolve_api_key_wrong_secret_raises_401():
     from app.auth.service import generate_api_key
+
     full_key, key_id, key_hash = generate_api_key()
     # A key_hash from a *different* key — secret won't match
     _, _, different_hash = generate_api_key()
@@ -245,6 +256,7 @@ async def test_resolve_api_key_wrong_secret_raises_401():
 # ---------------------------------------------------------------------------
 # _build_401 helper
 # ---------------------------------------------------------------------------
+
 
 def test_build_401_without_scopes_uses_plain_bearer():
     exc = _build_401(_no_scopes(), "Not authenticated")

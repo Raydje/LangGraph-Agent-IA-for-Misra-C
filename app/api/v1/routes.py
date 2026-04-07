@@ -1,8 +1,19 @@
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, Security
+
+from app.api.dependencies import (
+    get_compiled_graph,
+    get_embedding_service,
+    get_mongodb_database,
+    get_mongodb_service,
+    get_pinecone_index,
+    get_pinecone_service,
+    get_usage_service,
+    limiter,
+)
+from app.api.rate_limit import enforce_user_budget, enforce_user_rate_limit
 from app.api.v1.requests import ComplianceQueryRequest
-from app.auth.dependencies import get_current_principal
-from app.auth.models import Principal
 from app.api.v1.responses import (
     ComplianceQueryResponse,
     HealthResponse,
@@ -12,14 +23,15 @@ from app.api.v1.responses import (
     ThreadHistoryResponse,
     UsageResponse,
 )
-from app.api.dependencies import get_compiled_graph, get_mongodb_service, get_mongodb_database, get_embedding_service, get_pinecone_index, get_pinecone_service, get_usage_service, limiter
-from app.api.rate_limit import enforce_user_rate_limit, enforce_user_budget
+from app.auth.dependencies import get_current_principal
+from app.auth.models import Principal
 from app.config import get_settings
 from app.data.ingest import main as ingest
 from app.services.usage_service import UsageService
 from app.utils import logger
 
 router = APIRouter()
+
 
 @router.get("/health", response_model=HealthResponse)
 @limiter.limit("30/minute")
@@ -53,6 +65,7 @@ async def health_check(
         pinecone_connected=pinecone_ok,
     )
 
+
 @router.post("/query", response_model=ComplianceQueryResponse)
 @limiter.limit("5/minute")
 async def query_compliance(
@@ -83,10 +96,14 @@ async def query_compliance(
     status_code = 200
     result = None  # Initialize before try block for finally access
 
-    config = {"configurable": {"thread_id": thread_id,
-                               "mongo_db": mongo_db,
-                               "pinecone_service": pinecone_service,
-                               "embedding_service": embedding_service}}
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "mongo_db": mongo_db,
+            "pinecone_service": pinecone_service,
+            "embedding_service": embedding_service,
+        }
+    }
     nodes_visited = None
     try:
         result = await graph.ainvoke(initial_state, config=config)
@@ -99,7 +116,9 @@ async def query_compliance(
         status_code = 500
         logger.exception("Compliance query failed for thread_id=%s", thread_id)
         logger.error("Error details: %s", str(e))
-        raise HTTPException(status_code=500, detail="Unable to process query. Please try again later or use health check endpoints.")
+        raise HTTPException(
+            status_code=500, detail="Unable to process query. Please try again later or use health check endpoints."
+        ) from e
     finally:
         # Record usage regardless of success/failure so cost is always tracked.
         # On exception the result dict may not exist — use safe defaults.
@@ -120,6 +139,7 @@ async def query_compliance(
 
     return _build_response(thread_id, result)
 
+
 @router.post("/seed", response_model=IngestResponse)
 @limiter.limit("2/minute")
 async def seed_database(
@@ -138,6 +158,7 @@ async def seed_database(
         rules_ingested=result.get("rules_ingested", 0),
         vectors_upserted=result.get("vectors_upserted", 0),
     )
+
 
 @router.post("/replay/{thread_id}/{checkpoint_id}", response_model=ComplianceQueryResponse)
 @limiter.limit("10/minute")
@@ -163,7 +184,7 @@ async def replay_from_checkpoint(
             "checkpoint_id": checkpoint_id,
             "mongo_db": mongo_db,
             "pinecone_service": pinecone_service,
-            "embedding_service": embedding_service
+            "embedding_service": embedding_service,
         }
     }
 
@@ -179,9 +200,10 @@ async def replay_from_checkpoint(
     except Exception as e:
         logger.exception("Replay failed for thread=%s checkpoint=%s", thread_id, checkpoint_id)
         logger.error("Error details: %s", str(e))
-        raise HTTPException(status_code=500, detail="Replay failed: maybe wrong checkpoint_id or gemini is down")
+        raise HTTPException(status_code=500, detail="Replay failed: maybe wrong checkpoint_id or gemini is down") from e
 
     return _build_response(thread_id, result)
+
 
 @router.get("/history/{thread_id}", response_model=ThreadHistoryResponse)
 @limiter.limit("20/minute")
@@ -198,11 +220,13 @@ async def get_thread_history(
     history: list[ThreadHistoryEntry] = []
 
     async for state in graph.aget_state_history(config):
-        history.append(ThreadHistoryEntry(
-            checkpoint_id=state.config["configurable"].get("checkpoint_id"),
-            next_node=state.next,
-            values={k: v for k, v in state.values.items() if k != "code_snippet"},
-        ))
+        history.append(
+            ThreadHistoryEntry(
+                checkpoint_id=state.config["configurable"].get("checkpoint_id"),
+                next_node=state.next,
+                values={k: v for k, v in state.values.items() if k != "code_snippet"},
+            )
+        )
 
     if not history:
         raise HTTPException(status_code=404, detail=f"No history found for thread_id '{thread_id}'")
@@ -224,7 +248,6 @@ async def get_usage(
     if not usage_data:
         raise HTTPException(status_code=404, detail="User not found")
     return UsageResponse(**usage_data)
-
 
 
 def _build_response(thread_id: str, result: dict) -> ComplianceQueryResponse:

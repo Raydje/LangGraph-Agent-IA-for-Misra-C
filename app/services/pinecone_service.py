@@ -1,5 +1,7 @@
 import asyncio
+
 from pinecone import Pinecone, ServerlessSpec
+
 from app.config import get_settings
 from app.utils import logger
 
@@ -52,9 +54,12 @@ class PineconeService:
                     for m in results.matches  # type: ignore[union-attr]
                 ]
             }
-        except asyncio.TimeoutError:
-            logger.error("Pinecone query timed out seconds. try healthy check on Pinecone index.", timeout=settings.pinecone_timeout)
-            return {"matches": []}            
+        except TimeoutError:
+            logger.error(
+                "Pinecone query timed out seconds. try healthy check on Pinecone index.",
+                timeout=settings.pinecone_timeout,
+            )
+            return {"matches": []}
 
     async def upsert_vectors(self, vectors: list[dict]) -> int:
         batch_size = 100

@@ -1,20 +1,20 @@
 import asyncio
-from typing import Literal, Any
-from pydantic import BaseModel, Field
+from typing import Any, Literal
+
 from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
+
+from app.config import get_settings
 from app.models.state import ComplianceState
 from app.services.llm_service import get_structured_llm
-from app.config import get_settings
-from app.utils import  extracting_tokens_metadata, logger
+from app.utils import extracting_tokens_metadata, logger
+
 
 # 1. Define the desired structured output schema
 class OrchestratorOutput(BaseModel):
-    intent: Literal["search", "validate", "explain"] = Field(
-        description="The classified intent of the user's request."
-    )
-    reasoning: str = Field(
-        description="A brief explanation (1-2 sentences) of why this intent was chosen."
-    )
+    intent: Literal["search", "validate", "explain"] = Field(description="The classified intent of the user's request.")
+    reasoning: str = Field(description="A brief explanation (1-2 sentences) of why this intent was chosen.")
+
 
 # 2. Define the Orchestrator Node function
 async def orchestrate(state: ComplianceState) -> dict[str, Any]:
@@ -31,8 +31,11 @@ async def orchestrate(state: ComplianceState) -> dict[str, Any]:
     structured_llm = get_structured_llm(OrchestratorOutput, temperature=settings.orchestrator_temperature)
 
     # Create the prompt instructing the LLM on how to classify for MISRA C:2023
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are the intelligent routing orchestrator for a C/C++ static analysis AI agent.
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are the intelligent routing orchestrator for a C/C++ static analysis AI agent.
         Your job is to analyze the user's request regarding the MISRA C:2023 standard and classify it into one of three intents:
 
         1. "search": The user is looking for specific MISRA C:2023 rules, guidelines, or documentation.
@@ -43,9 +46,11 @@ async def orchestrate(state: ComplianceState) -> dict[str, Any]:
            (e.g., "Explain why recursion is banned in MISRA", "What is the rationale behind rule 11.4?")
 
         Analyze the inputs carefully and output the intent and your reasoning.
-        """),
-        ("human", "User Query: {query}\n\nProvided Code (if any):\n{code}")
-    ])
+        """,
+            ),
+            ("human", "User Query: {query}\n\nProvided Code (if any):\n{code}"),
+        ]
+    )
 
     # Chain the prompt and the structured LLM together
     # include_raw=True returns {"raw": AIMessage, "parsed": OrchestratorOutput, "parsing_error": ...}
@@ -54,14 +59,11 @@ async def orchestrate(state: ComplianceState) -> dict[str, Any]:
     # Invoke the chain with the current state data
     try:
         raw_result = await asyncio.wait_for(
-            chain.ainvoke({
-                "query": query,
-                "code": code_snippet if code_snippet else "None provided."
-            }),
-            timeout=settings.llm_timeout
+            chain.ainvoke({"query": query, "code": code_snippet if code_snippet else "None provided."}),
+            timeout=settings.llm_timeout,
         )
-    except asyncio.TimeoutError:
-        logger.error("Orchestrator LLM call timed out after seconds.", timeout = settings.llm_timeout)
+    except TimeoutError:
+        logger.error("Orchestrator LLM call timed out after seconds.", timeout=settings.llm_timeout)
         return {
             "intent": "search",
             "orchestrator_reasoning": "Orchestrator timed out; defaulting to search.",

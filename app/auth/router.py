@@ -16,13 +16,15 @@ Admin self-registration:
     to receive scopes ["query:read", "admin:seed", "admin:replay", "admin:all"].
     Set ADMIN_REGISTRATION_TOKEN= in .env (empty = feature disabled).
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Security, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import JWTError
 
 from app.auth.dependencies import get_current_principal
 from app.auth.models import (
@@ -43,7 +45,6 @@ from app.auth.service import (
     verify_password,
 )
 from app.config import get_settings
-from jose import JWTError
 
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -54,6 +55,7 @@ _DEFAULT_SCOPES = ["query:read"]
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
+
 
 @auth_router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: UserCreate, request: Request):
@@ -79,18 +81,20 @@ async def register(body: UserCreate, request: Request):
         scopes = _DEFAULT_SCOPES
 
     user_id = str(uuid.uuid4())
-    await db["users"].insert_one({
-        "_id": user_id,
-        "email": body.email,
-        "hashed_password": hash_password(body.password),
-        "scopes": scopes,
-        "is_active": True,
-        "refresh_tokens": [],
-        "created_at": datetime.now(timezone.utc),
-        # Usage tracking (updated atomically by UsageService after each query)
-        "total_cost": 0.0,
-        "total_requests": 0,
-    })
+    await db["users"].insert_one(
+        {
+            "_id": user_id,
+            "email": body.email,
+            "hashed_password": hash_password(body.password),
+            "scopes": scopes,
+            "is_active": True,
+            "refresh_tokens": [],
+            "created_at": datetime.now(UTC),
+            # Usage tracking (updated atomically by UsageService after each query)
+            "total_cost": 0.0,
+            "total_requests": 0,
+        }
+    )
 
     return {"user_id": user_id, "email": body.email, "scopes": scopes}
 
@@ -98,6 +102,7 @@ async def register(body: UserCreate, request: Request):
 # ---------------------------------------------------------------------------
 # Token issuance (OAuth2 password flow)
 # ---------------------------------------------------------------------------
+
 
 @auth_router.post("/token", response_model=TokenResponse)
 async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
@@ -123,10 +128,14 @@ async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
 
     await db["users"].update_one(
         {"_id": user["_id"]},
-        {"$push": {"refresh_tokens": {
-            "token": refresh_token,
-            "issued_at": datetime.now(timezone.utc),
-        }}},
+        {
+            "$push": {
+                "refresh_tokens": {
+                    "token": refresh_token,
+                    "issued_at": datetime.now(UTC),
+                }
+            }
+        },
     )
 
     return TokenResponse(
@@ -140,6 +149,7 @@ async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
 # Token refresh (refresh token rotation)
 # ---------------------------------------------------------------------------
 
+
 @auth_router.post("/refresh", response_model=TokenResponse)
 async def refresh(body: RefreshRequest, request: Request):
     """Rotate a refresh token.
@@ -152,14 +162,16 @@ async def refresh(body: RefreshRequest, request: Request):
         payload = decode_token(body.refresh_token)
         if payload.get("type") != "refresh":
             raise ValueError("Not a refresh token")
-    except (JWTError, ValueError):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
+    except (JWTError, ValueError) as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token") from e
 
     db = request.app.state.mongodb.db
-    user = await db["users"].find_one({
-        "_id": payload["sub"],
-        "refresh_tokens.token": body.refresh_token,
-    })
+    user = await db["users"].find_one(
+        {
+            "_id": payload["sub"],
+            "refresh_tokens.token": body.refresh_token,
+        }
+    )
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -172,10 +184,12 @@ async def refresh(body: RefreshRequest, request: Request):
         {"_id": user["_id"]},
         {
             "$pull": {"refresh_tokens": {"token": body.refresh_token}},
-            "$push": {"refresh_tokens": {
-                "token": new_refresh,
-                "issued_at": datetime.now(timezone.utc),
-            }},
+            "$push": {
+                "refresh_tokens": {
+                    "token": new_refresh,
+                    "issued_at": datetime.now(UTC),
+                }
+            },
         },
     )
 
@@ -191,6 +205,7 @@ async def refresh(body: RefreshRequest, request: Request):
 # API key management
 # ---------------------------------------------------------------------------
 
+
 @auth_router.post("/api-keys", response_model=APIKeyResponse, status_code=status.HTTP_201_CREATED)
 async def create_api_key(
     body: APIKeyCreate,
@@ -204,8 +219,7 @@ async def create_api_key(
     """
     # Prevent privilege escalation: strip scopes the caller doesn't hold
     allowed_scopes = (
-        body.scopes if "admin:all" in principal.scopes
-        else [s for s in body.scopes if s in principal.scopes]
+        body.scopes if "admin:all" in principal.scopes else [s for s in body.scopes if s in principal.scopes]
     )
     if not allowed_scopes:
         raise HTTPException(status_code=400, detail="No valid scopes — you cannot grant scopes you don't hold")
@@ -213,17 +227,19 @@ async def create_api_key(
     full_key, key_id, key_hash = generate_api_key()
     db = request.app.state.mongodb.db
 
-    await db["api_keys"].insert_one({
-        "key_id": key_id,
-        "name": body.name,
-        "key_hash": key_hash,
-        "user_id": principal.user_id,
-        "scopes": allowed_scopes,
-        "expires_at": body.expires_at,
-        "is_active": True,
-        "last_used_at": None,
-        "created_at": datetime.now(timezone.utc),
-    })
+    await db["api_keys"].insert_one(
+        {
+            "key_id": key_id,
+            "name": body.name,
+            "key_hash": key_hash,
+            "user_id": principal.user_id,
+            "scopes": allowed_scopes,
+            "expires_at": body.expires_at,
+            "is_active": True,
+            "last_used_at": None,
+            "created_at": datetime.now(UTC),
+        }
+    )
 
     return APIKeyResponse(
         key_id=key_id,
@@ -243,15 +259,17 @@ async def list_api_keys(
     db = request.app.state.mongodb.db
     keys: list[APIKeyInfo] = []
     async for doc in db["api_keys"].find({"user_id": principal.user_id, "is_active": True}):
-        keys.append(APIKeyInfo(
-            key_id=doc["key_id"],
-            name=doc["name"],
-            scopes=doc.get("scopes", []),
-            expires_at=doc.get("expires_at"),
-            last_used_at=doc.get("last_used_at"),
-            is_active=doc["is_active"],
-            created_at=doc["created_at"],
-        ))
+        keys.append(
+            APIKeyInfo(
+                key_id=doc["key_id"],
+                name=doc["name"],
+                scopes=doc.get("scopes", []),
+                expires_at=doc.get("expires_at"),
+                last_used_at=doc.get("last_used_at"),
+                is_active=doc["is_active"],
+                created_at=doc["created_at"],
+            )
+        )
     return keys
 
 

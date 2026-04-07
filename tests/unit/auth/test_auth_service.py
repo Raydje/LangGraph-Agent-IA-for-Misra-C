@@ -5,10 +5,11 @@ Unit tests for app/auth/service.py.
 All cryptographic operations are exercised with real bcrypt/jose calls —
 no mocking needed because there are no network calls involved.
 """
+
 from __future__ import annotations
 
 import pytest
-from jose import jwt, JWTError
+from jose import JWTError
 
 from app.auth.service import (
     create_access_token,
@@ -21,10 +22,10 @@ from app.auth.service import (
     verify_password,
 )
 
-
 # ---------------------------------------------------------------------------
 # Passwords
 # ---------------------------------------------------------------------------
+
 
 def test_hash_password_returns_bcrypt_string():
     hashed = hash_password("correct-horse-battery")
@@ -46,6 +47,7 @@ def test_verify_password_wrong_plaintext_returns_false():
 # ---------------------------------------------------------------------------
 # API keys
 # ---------------------------------------------------------------------------
+
 
 def test_generate_api_key_returns_three_tuple():
     full_key, key_id, key_hash = generate_api_key()
@@ -97,6 +99,7 @@ def test_parse_api_key_too_few_segments_raises_value_error():
 # JWT — access token
 # ---------------------------------------------------------------------------
 
+
 def test_create_access_token_returns_decodable_jwt():
     token, expires_in = create_access_token("user-1", "a@b.com", ["query:read"])
     assert isinstance(token, str)
@@ -115,6 +118,7 @@ def test_create_access_token_has_correct_claims():
 # ---------------------------------------------------------------------------
 # JWT — refresh token
 # ---------------------------------------------------------------------------
+
 
 def test_create_refresh_token_returns_decodable_jwt():
     token = create_refresh_token("user-1")
@@ -135,6 +139,7 @@ def test_create_refresh_token_jti_is_unique():
 # ---------------------------------------------------------------------------
 # JWT — decode_token error paths
 # ---------------------------------------------------------------------------
+
 
 def test_decode_token_raises_on_tampered_signature():
     token, _ = create_access_token("u", "u@u.com", [])

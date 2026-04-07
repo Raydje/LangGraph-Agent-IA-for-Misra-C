@@ -8,6 +8,7 @@ so we use a minimal MagicMock request rather than a full FastAPI TestClient.
 The module-level `limiter` fallback branch (lines 49-50) is covered by reloading
 the module with get_settings patched to raise, then restoring it via a fixture.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -15,10 +16,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_request(**state_attrs) -> MagicMock:
     """Build a minimal mock Request whose app.state carries the given attrs."""
@@ -32,8 +33,10 @@ def _make_request(**state_attrs) -> MagicMock:
 # Getter functions — each returns the corresponding app.state attribute
 # ---------------------------------------------------------------------------
 
+
 def test_get_mongodb_service_returns_state_mongodb():
     from app.api.dependencies import get_mongodb_service
+
     svc = MagicMock()
     req = _make_request(mongodb=svc)
     assert get_mongodb_service(req) is svc
@@ -41,6 +44,7 @@ def test_get_mongodb_service_returns_state_mongodb():
 
 def test_get_mongodb_checkpoint_service_returns_state_mongodb_checkpoint():
     from app.api.dependencies import get_mongodb_checkpoint_service
+
     svc = MagicMock()
     req = _make_request(mongodb_checkpoint=svc)
     assert get_mongodb_checkpoint_service(req) is svc
@@ -48,6 +52,7 @@ def test_get_mongodb_checkpoint_service_returns_state_mongodb_checkpoint():
 
 def test_get_pinecone_service_returns_state_pinecone():
     from app.api.dependencies import get_pinecone_service
+
     svc = MagicMock()
     req = _make_request(pinecone=svc)
     assert get_pinecone_service(req) is svc
@@ -55,6 +60,7 @@ def test_get_pinecone_service_returns_state_pinecone():
 
 def test_get_embedding_service_returns_state_embedding():
     from app.api.dependencies import get_embedding_service
+
     svc = MagicMock()
     req = _make_request(embedding=svc)
     assert get_embedding_service(req) is svc
@@ -62,6 +68,7 @@ def test_get_embedding_service_returns_state_embedding():
 
 def test_get_compiled_graph_returns_state_graph():
     from app.api.dependencies import get_compiled_graph
+
     graph = MagicMock()
     req = _make_request(graph=graph)
     assert get_compiled_graph(req) is graph
@@ -69,6 +76,7 @@ def test_get_compiled_graph_returns_state_graph():
 
 def test_get_mongodb_database_returns_state_mongodb_db():
     from app.api.dependencies import get_mongodb_database
+
     db = MagicMock()
     svc = MagicMock()
     svc.db = db
@@ -78,6 +86,7 @@ def test_get_mongodb_database_returns_state_mongodb_db():
 
 def test_get_pinecone_index_returns_state_pinecone_index():
     from app.api.dependencies import get_pinecone_index
+
     index = MagicMock()
     svc = MagicMock()
     svc.index = index
@@ -89,8 +98,10 @@ def test_get_pinecone_index_returns_state_pinecone_index():
 # get_real_ip
 # ---------------------------------------------------------------------------
 
+
 def test_get_real_ip_returns_first_forwarded_for_ip():
     from app.api.dependencies import get_real_ip
+
     req = MagicMock()
     req.headers.get.return_value = "203.0.113.5, 10.0.0.1, 172.16.0.1"
     assert get_real_ip(req) == "203.0.113.5"
@@ -99,6 +110,7 @@ def test_get_real_ip_returns_first_forwarded_for_ip():
 
 def test_get_real_ip_falls_back_to_get_remote_address_when_no_header():
     from app.api.dependencies import get_real_ip
+
     req = MagicMock()
     req.headers.get.return_value = None
 
@@ -112,6 +124,7 @@ def test_get_real_ip_falls_back_to_get_remote_address_when_no_header():
 # ---------------------------------------------------------------------------
 # _redis_reachable
 # ---------------------------------------------------------------------------
+
 
 def test_redis_reachable_returns_true_when_ping_succeeds():
     from app.api.dependencies import _redis_reachable
@@ -151,11 +164,13 @@ def test_redis_reachable_returns_false_when_ping_raises():
 # The fixture restores the module to its normal state after the test.
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def restored_dependencies_module():
     """Reload app.api.dependencies after the test to restore normal state."""
     yield
     import app.api.dependencies as dep_mod
+
     importlib.reload(dep_mod)
 
 
@@ -167,4 +182,5 @@ def test_limiter_fallback_created_when_get_settings_raises(restored_dependencies
 
     # The fallback limiter must exist and be a Limiter instance
     from slowapi import Limiter
+
     assert isinstance(dep_mod.limiter, Limiter)

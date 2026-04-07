@@ -1,18 +1,18 @@
 import asyncio
 from typing import Any
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
-from langchain_core.messages import SystemMessage, HumanMessage
+
+from app.config import get_settings
 from app.models.state import ComplianceState
 from app.services.llm_service import get_structured_llm
-from app.config import get_settings
 from app.utils import extracting_tokens_metadata, logger
 
 
 # Structured output schema — guarantees valid typed output from the LLM
 class RemediationOutput(BaseModel):
-    fixed_code_snippet: str = Field(
-        description="The complete corrected C code, ready to compile."
-    )
+    fixed_code_snippet: str = Field(description="The complete corrected C code, ready to compile.")
     remediation_explanation: str = Field(
         description=(
             "A per-rule breakdown. For each violation addressed, use the format: "
@@ -46,10 +46,13 @@ async def remediate_code(state: ComplianceState) -> dict[str, Any]:
     )
     if not cited_rules_context:
         # Fallback: show all retrieved rules if none match (e.g. ID format mismatch)
-        cited_rules_context = "\n\n".join(
-            f"Rule ID: {r['rule_id']}\nCategory: {r.get('category', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"
-            for r in retrieved_rules
-        ) or "No rule details available."
+        cited_rules_context = (
+            "\n\n".join(
+                f"Rule ID: {r['rule_id']}\nCategory: {r.get('category', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"
+                for r in retrieved_rules
+            )
+            or "No rule details available."
+        )
 
     system_prompt = """You are a Senior Embedded C Software Engineer and an expert in the MISRA C:2023 standard.
 Your task is to fix the provided C code snippet so that it complies with the cited MISRA C:2023 rules.
@@ -91,11 +94,8 @@ Provide your structured remediation output."""
 
     # Use with_structured_output for guaranteed Pydantic-validated output
     try:
-        raw_result = await asyncio.wait_for(
-            structured_llm.ainvoke(messages),
-            timeout=settings.llm_timeout
-        )
-    except asyncio.TimeoutError:
+        raw_result = await asyncio.wait_for(structured_llm.ainvoke(messages), timeout=settings.llm_timeout)
+    except TimeoutError:
         logger.error("Remediation LLM call timed out after seconds.", timeout=settings.llm_timeout)
         return {
             "fixed_code_snippet": code_snippet,
@@ -126,7 +126,12 @@ Provide your structured remediation output."""
         }
 
     tokens_metadata = extracting_tokens_metadata(raw_result)
-    logger.info("Remediation_node_result", fixed_code_snippet=fixed_code, input_tokens=tokens_metadata["prompt_tokens"], output_tokens=tokens_metadata["completion_tokens"])
+    logger.info(
+        "Remediation_node_result",
+        fixed_code_snippet=fixed_code,
+        input_tokens=tokens_metadata["prompt_tokens"],
+        output_tokens=tokens_metadata["completion_tokens"],
+    )
 
     return {
         "fixed_code_snippet": fixed_code,

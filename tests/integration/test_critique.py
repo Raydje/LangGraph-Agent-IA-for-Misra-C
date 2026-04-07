@@ -87,10 +87,9 @@ async def test_critique_approves_perfect_validation():
     result = await critique_node(state)
 
     _assert_base_shape(result)
-    assert result["critique_approved"] is True, (
-        f"Expected critique_approved=True for a perfect validation. "
-        f"Got False.\nFeedback: {result['critique_feedback']}"
-    )
+    assert (
+        result["critique_approved"] is True
+    ), f"Expected critique_approved=True for a perfect validation. Got False.\nFeedback: {result['critique_feedback']}"
 
 
 async def test_critique_rejects_hallucinated_rule():
@@ -104,9 +103,7 @@ async def test_critique_rejects_hallucinated_rule():
     state: ComplianceState = {
         "code_snippet": "int *p = (int *)0x1234;",
         "retrieved_rules": [{"rule_id": "Rule 11.4"}],  # Only 11.4 was retrieved
-        "validation_result": (
-            "The code violates Rule 11.6 (Required) because it casts an integer to a pointer."
-        ),
+        "validation_result": ("The code violates Rule 11.6 (Required) because it casts an integer to a pointer."),
         "cited_rules": ["Rule 11.6"],  # Agent cites 11.6 — hallucination
         "is_compliant": False,
         "iteration_count": 0,
@@ -129,9 +126,7 @@ async def test_critique_rejects_logical_inconsistency():
     state: ComplianceState = {
         "code_snippet": "void func() { return; }",
         "retrieved_rules": [{"rule_id": "Rule 2.1"}],
-        "validation_result": (
-            "The code violates Rule 2.1 (Required) because it contains unreachable code."
-        ),
+        "validation_result": ("The code violates Rule 2.1 (Required) because it contains unreachable code."),
         "cited_rules": ["Rule 2.1"],
         "is_compliant": True,  # Contradiction: text says violated, boolean says compliant
         "iteration_count": 0,

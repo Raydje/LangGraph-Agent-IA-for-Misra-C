@@ -1,6 +1,7 @@
 from __future__ import annotations
-from typing import TypedDict, Annotated, Literal, NotRequired
+
 import operator
+from typing import Annotated, Literal, NotRequired, TypedDict
 
 
 class RetrievedRule(TypedDict):

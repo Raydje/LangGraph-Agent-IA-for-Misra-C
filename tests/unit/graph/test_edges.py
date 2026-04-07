@@ -1,7 +1,7 @@
 from app.graph.edges import route_after_rag, should_loop_or_finish
 
-
 # --- route_after_rag ---
+
 
 def test_validate_intent_routes_to_validation_node():
     assert route_after_rag({"intent": "validate"}) == "validation_node"
@@ -16,6 +16,7 @@ def test_explain_intent_routes_to_assemble_node():
 
 
 # --- should_loop_or_finish ---
+
 
 def test_approved_compliant_goes_to_assemble():
     state = {"critique_approved": True, "is_compliant": True, "iteration_count": 1, "max_iterations": 4}

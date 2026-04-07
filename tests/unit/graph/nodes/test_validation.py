@@ -1,11 +1,12 @@
-from unittest.mock import MagicMock, AsyncMock, patch
 import asyncio
-from app.graph.nodes.validation import validation_node, ValidationOutput
+from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.graph.nodes.validation import ValidationOutput, validation_node
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _mock_structured_llm(
     parsed: ValidationOutput | None,
@@ -17,11 +18,13 @@ def _mock_structured_llm(
     raw.usage_metadata = {"input_tokens": input_tokens, "output_tokens": output_tokens}
 
     structured_chain = MagicMock()
-    structured_chain.ainvoke = AsyncMock(return_value={
-        "raw": raw,
-        "parsed": parsed,
-        "parsing_error": None if parsed else ValueError("parse failed"),
-    })
+    structured_chain.ainvoke = AsyncMock(
+        return_value={
+            "raw": raw,
+            "parsed": parsed,
+            "parsing_error": None if parsed else ValueError("parse failed"),
+        }
+    )
     return structured_chain
 
 
@@ -55,6 +58,7 @@ VALID_OUTPUT = ValidationOutput(
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 async def test_valid_response_maps_all_fields():
     with patch("app.graph.nodes.validation.get_structured_llm", return_value=_mock_structured_llm(VALID_OUTPUT)):
@@ -99,9 +103,7 @@ async def test_parse_failure_still_increments_iteration():
 
 async def test_critique_feedback_on_second_iteration_does_not_crash():
     with patch("app.graph.nodes.validation.get_structured_llm", return_value=_mock_structured_llm(VALID_OUTPUT)):
-        result = await validation_node(
-            _base_state(iteration_count=1, critique_feedback="Rule hallucination found.")
-        )
+        result = await validation_node(_base_state(iteration_count=1, critique_feedback="Rule hallucination found."))
 
     assert result["iteration_count"] == 2
 
@@ -123,7 +125,10 @@ async def test_get_structured_llm_called_with_validation_output_schema():
 
 
 async def test_token_counts_propagated():
-    with patch("app.graph.nodes.validation.get_structured_llm", return_value=_mock_structured_llm(VALID_OUTPUT, input_tokens=100, output_tokens=50)):
+    with patch(
+        "app.graph.nodes.validation.get_structured_llm",
+        return_value=_mock_structured_llm(VALID_OUTPUT, input_tokens=100, output_tokens=50),
+    ):
         result = await validation_node(_base_state())
 
     assert result["prompt_tokens"] == 100
@@ -134,8 +139,10 @@ async def test_token_counts_propagated():
 
 async def test_timeout_returns_not_compliant_and_zero_tokens():
     """asyncio.TimeoutError during LLM call → is_compliant False, all tokens zero."""
-    with patch("app.graph.nodes.validation.get_structured_llm", return_value=_mock_structured_llm(VALID_OUTPUT)), \
-         patch("app.graph.nodes.validation.asyncio.wait_for", side_effect=asyncio.TimeoutError):
+    with (
+        patch("app.graph.nodes.validation.get_structured_llm", return_value=_mock_structured_llm(VALID_OUTPUT)),
+        patch("app.graph.nodes.validation.asyncio.wait_for", side_effect=asyncio.TimeoutError),
+    ):
         result = await validation_node(_base_state())
 
     assert result["is_compliant"] is False

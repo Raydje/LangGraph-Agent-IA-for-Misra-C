@@ -38,10 +38,9 @@ async def test_orchestrator_search_intent():
 
     result = await orchestrate(state)
 
-    assert result["intent"] == "search", (
-        f"Expected intent='search', got '{result['intent']}'. "
-        f"Reasoning: {result.get('orchestrator_reasoning')}"
-    )
+    assert (
+        result["intent"] == "search"
+    ), f"Expected intent='search', got '{result['intent']}'. Reasoning: {result.get('orchestrator_reasoning')}"
     assert isinstance(result.get("orchestrator_reasoning"), str)
     assert len(result["orchestrator_reasoning"]) > 0
     # Token accounting must be present and non-negative
@@ -57,21 +56,15 @@ async def test_orchestrator_validate_intent():
     """
     state: ComplianceState = {
         "query": "Please check this snippet and see if it complies with MISRA rules.",
-        "code_snippet": (
-            "int divide(int a, int b) {\n"
-            "    if (b == 0) return 0;\n"
-            "    return a / b;\n"
-            "}"
-        ),
+        "code_snippet": ("int divide(int a, int b) {\n    if (b == 0) return 0;\n    return a / b;\n}"),
         "standard": "MISRA C:2023",
     }
 
     result = await orchestrate(state)
 
-    assert result["intent"] == "validate", (
-        f"Expected intent='validate', got '{result['intent']}'. "
-        f"Reasoning: {result.get('orchestrator_reasoning')}"
-    )
+    assert (
+        result["intent"] == "validate"
+    ), f"Expected intent='validate', got '{result['intent']}'. Reasoning: {result.get('orchestrator_reasoning')}"
     assert isinstance(result.get("orchestrator_reasoning"), str)
     assert len(result["orchestrator_reasoning"]) > 0
     assert result.get("total_tokens", 0) >= 0
@@ -91,10 +84,9 @@ async def test_orchestrator_explain_intent():
 
     result = await orchestrate(state)
 
-    assert result["intent"] == "explain", (
-        f"Expected intent='explain', got '{result['intent']}'. "
-        f"Reasoning: {result.get('orchestrator_reasoning')}"
-    )
+    assert (
+        result["intent"] == "explain"
+    ), f"Expected intent='explain', got '{result['intent']}'. Reasoning: {result.get('orchestrator_reasoning')}"
     assert isinstance(result.get("orchestrator_reasoning"), str)
     assert len(result["orchestrator_reasoning"]) > 0
     assert result.get("total_tokens", 0) >= 0

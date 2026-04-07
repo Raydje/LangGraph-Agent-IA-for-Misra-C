@@ -5,19 +5,18 @@ Unit tests for app/data/ingest.py.
 parse_misra_file: uses pytest tmp_path for real file I/O.
 upload_to_mongodb: uses AsyncMock to avoid any real DB connection.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
-from app.data.ingest import parse_misra_file, upload_to_mongodb, main, run_ingest_cli
-
+from app.data.ingest import main, parse_misra_file, run_ingest_cli, upload_to_mongodb
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _write_rules_file(tmp_path: Path, content: str) -> Path:
     """Write content to a temp file and return a path relative to project root
@@ -47,6 +46,7 @@ def _make_mongodb_service(bulk_result_counts: tuple[int, int] = (5, 0)) -> Magic
 # parse_misra_file — happy paths
 # ---------------------------------------------------------------------------
 
+
 def test_parse_misra_parses_rule_header(tmp_path: Path):
     (tmp_path / "rules.txt").write_text(
         "Rule 1.1    Required\nNo dead code allowed.\n",
@@ -61,28 +61,33 @@ def test_parse_misra_parses_rule_header(tmp_path: Path):
 
     # Use the real file system: patch base_dir inside the function
     import app.data.ingest as ingest_mod
-    original_path = ingest_mod.Path
 
     class _FakePath:
         def __init__(self, *args):
             self._p = Path(*args)
+
         def resolve(self):
             return self
+
         @property
         def parent(self):
             # Return a FakePath whose / operator points into tmp_path
             return _FakeParent(tmp_path)
+
         def __truediv__(self, other):
             return self._p / other
+
         def __str__(self):
             return str(self._p)
 
     class _FakeParent:
         def __init__(self, root):
             self._root = root
+
         @property
         def parent(self):
             return self
+
         def __truediv__(self, other):
             return self._root / other
 
@@ -104,17 +109,29 @@ def test_parse_misra_parses_dir_header(tmp_path: Path):
     import app.data.ingest as ingest_mod
 
     class _FakeParent:
-        def __init__(self, root): self._root = root
+        def __init__(self, root):
+            self._root = root
+
         @property
-        def parent(self): return self
-        def __truediv__(self, other): return self._root / other
+        def parent(self):
+            return self
+
+        def __truediv__(self, other):
+            return self._root / other
 
     class _FakePath:
-        def __init__(self, *a): self._p = Path(*a)
-        def resolve(self): return self
+        def __init__(self, *a):
+            self._p = Path(*a)
+
+        def resolve(self):
+            return self
+
         @property
-        def parent(self): return _FakeParent(tmp_path)
-        def __truediv__(self, other): return self._p / other
+        def parent(self):
+            return _FakeParent(tmp_path)
+
+        def __truediv__(self, other):
+            return self._p / other
 
     (tmp_path / "rules.txt").write_text(
         "Dir 4.1\tRequired\nRun-time failures shall be minimized.\n",
@@ -132,24 +149,31 @@ def test_parse_misra_skips_comments_and_blank_lines(tmp_path: Path):
     import app.data.ingest as ingest_mod
 
     class _FakeParent:
-        def __init__(self, root): self._root = root
+        def __init__(self, root):
+            self._root = root
+
         @property
-        def parent(self): return self
-        def __truediv__(self, other): return self._root / other
+        def parent(self):
+            return self
+
+        def __truediv__(self, other):
+            return self._root / other
 
     class _FakePath:
-        def __init__(self, *a): self._p = Path(*a)
-        def resolve(self): return self
-        @property
-        def parent(self): return _FakeParent(tmp_path)
-        def __truediv__(self, other): return self._p / other
+        def __init__(self, *a):
+            self._p = Path(*a)
 
-    content = (
-        "# This is a comment\n"
-        "\n"
-        "Rule 2.2    Advisory\n"
-        "Feasibility rule.\n"
-    )
+        def resolve(self):
+            return self
+
+        @property
+        def parent(self):
+            return _FakeParent(tmp_path)
+
+        def __truediv__(self, other):
+            return self._p / other
+
+    content = "# This is a comment\n\nRule 2.2    Advisory\nFeasibility rule.\n"
     (tmp_path / "rules.txt").write_text(content, encoding="utf-8")
     with patch.object(ingest_mod, "Path", side_effect=lambda *a: _FakePath(*a)):
         rules = parse_misra_file("rules.txt")
@@ -162,23 +186,31 @@ def test_parse_misra_multiline_text_concatenated_with_space(tmp_path: Path):
     import app.data.ingest as ingest_mod
 
     class _FakeParent:
-        def __init__(self, root): self._root = root
+        def __init__(self, root):
+            self._root = root
+
         @property
-        def parent(self): return self
-        def __truediv__(self, other): return self._root / other
+        def parent(self):
+            return self
+
+        def __truediv__(self, other):
+            return self._root / other
 
     class _FakePath:
-        def __init__(self, *a): self._p = Path(*a)
-        def resolve(self): return self
-        @property
-        def parent(self): return _FakeParent(tmp_path)
-        def __truediv__(self, other): return self._p / other
+        def __init__(self, *a):
+            self._p = Path(*a)
 
-    content = (
-        "Rule 3.1    Required\n"
-        "First line of text.\n"
-        "Second line of text.\n"
-    )
+        def resolve(self):
+            return self
+
+        @property
+        def parent(self):
+            return _FakeParent(tmp_path)
+
+        def __truediv__(self, other):
+            return self._p / other
+
+    content = "Rule 3.1    Required\nFirst line of text.\nSecond line of text.\n"
     (tmp_path / "rules.txt").write_text(content, encoding="utf-8")
     with patch.object(ingest_mod, "Path", side_effect=lambda *a: _FakePath(*a)):
         rules = parse_misra_file("rules.txt")
@@ -191,17 +223,29 @@ def test_parse_misra_last_rule_captured(tmp_path: Path):
     import app.data.ingest as ingest_mod
 
     class _FakeParent:
-        def __init__(self, root): self._root = root
+        def __init__(self, root):
+            self._root = root
+
         @property
-        def parent(self): return self
-        def __truediv__(self, other): return self._root / other
+        def parent(self):
+            return self
+
+        def __truediv__(self, other):
+            return self._root / other
 
     class _FakePath:
-        def __init__(self, *a): self._p = Path(*a)
-        def resolve(self): return self
+        def __init__(self, *a):
+            self._p = Path(*a)
+
+        def resolve(self):
+            return self
+
         @property
-        def parent(self): return _FakeParent(tmp_path)
-        def __truediv__(self, other): return self._p / other
+        def parent(self):
+            return _FakeParent(tmp_path)
+
+        def __truediv__(self, other):
+            return self._p / other
 
     content = "Rule 1.1    Required\nFirst rule.\nRule 2.2    Advisory\nLast rule."
     (tmp_path / "rules.txt").write_text(content, encoding="utf-8")
@@ -216,17 +260,29 @@ def test_parse_misra_empty_file_returns_empty_list(tmp_path: Path):
     import app.data.ingest as ingest_mod
 
     class _FakeParent:
-        def __init__(self, root): self._root = root
+        def __init__(self, root):
+            self._root = root
+
         @property
-        def parent(self): return self
-        def __truediv__(self, other): return self._root / other
+        def parent(self):
+            return self
+
+        def __truediv__(self, other):
+            return self._root / other
 
     class _FakePath:
-        def __init__(self, *a): self._p = Path(*a)
-        def resolve(self): return self
+        def __init__(self, *a):
+            self._p = Path(*a)
+
+        def resolve(self):
+            return self
+
         @property
-        def parent(self): return _FakeParent(tmp_path)
-        def __truediv__(self, other): return self._p / other
+        def parent(self):
+            return _FakeParent(tmp_path)
+
+        def __truediv__(self, other):
+            return self._p / other
 
     (tmp_path / "rules.txt").write_text("", encoding="utf-8")
     with patch.object(ingest_mod, "Path", side_effect=lambda *a: _FakePath(*a)):
@@ -239,17 +295,29 @@ def test_parse_misra_file_not_found_returns_empty_list(tmp_path: Path):
     import app.data.ingest as ingest_mod
 
     class _FakeParent:
-        def __init__(self, root): self._root = root
+        def __init__(self, root):
+            self._root = root
+
         @property
-        def parent(self): return self
-        def __truediv__(self, other): return self._root / other
+        def parent(self):
+            return self
+
+        def __truediv__(self, other):
+            return self._root / other
 
     class _FakePath:
-        def __init__(self, *a): self._p = Path(*a)
-        def resolve(self): return self
+        def __init__(self, *a):
+            self._p = Path(*a)
+
+        def resolve(self):
+            return self
+
         @property
-        def parent(self): return _FakeParent(tmp_path)
-        def __truediv__(self, other): return self._p / other
+        def parent(self):
+            return _FakeParent(tmp_path)
+
+        def __truediv__(self, other):
+            return self._p / other
 
     with patch.object(ingest_mod, "Path", side_effect=lambda *a: _FakePath(*a)):
         rules = parse_misra_file("nonexistent_file.txt")
@@ -262,17 +330,29 @@ def test_parse_misra_tab_separated_header(tmp_path: Path):
     import app.data.ingest as ingest_mod
 
     class _FakeParent:
-        def __init__(self, root): self._root = root
+        def __init__(self, root):
+            self._root = root
+
         @property
-        def parent(self): return self
-        def __truediv__(self, other): return self._root / other
+        def parent(self):
+            return self
+
+        def __truediv__(self, other):
+            return self._root / other
 
     class _FakePath:
-        def __init__(self, *a): self._p = Path(*a)
-        def resolve(self): return self
+        def __init__(self, *a):
+            self._p = Path(*a)
+
+        def resolve(self):
+            return self
+
         @property
-        def parent(self): return _FakeParent(tmp_path)
-        def __truediv__(self, other): return self._p / other
+        def parent(self):
+            return _FakeParent(tmp_path)
+
+        def __truediv__(self, other):
+            return self._p / other
 
     (tmp_path / "rules.txt").write_text(
         "Rule 22.15\tMandatory\nNo dynamic memory after init.\n",
@@ -290,21 +370,31 @@ def test_parse_misra_scope_is_always_misra_c_2023(tmp_path: Path):
     import app.data.ingest as ingest_mod
 
     class _FakeParent:
-        def __init__(self, root): self._root = root
+        def __init__(self, root):
+            self._root = root
+
         @property
-        def parent(self): return self
-        def __truediv__(self, other): return self._root / other
+        def parent(self):
+            return self
+
+        def __truediv__(self, other):
+            return self._root / other
 
     class _FakePath:
-        def __init__(self, *a): self._p = Path(*a)
-        def resolve(self): return self
-        @property
-        def parent(self): return _FakeParent(tmp_path)
-        def __truediv__(self, other): return self._p / other
+        def __init__(self, *a):
+            self._p = Path(*a)
 
-    (tmp_path / "rules.txt").write_text(
-        "Rule 1.1    Required\nScope test.\n", encoding="utf-8"
-    )
+        def resolve(self):
+            return self
+
+        @property
+        def parent(self):
+            return _FakeParent(tmp_path)
+
+        def __truediv__(self, other):
+            return self._p / other
+
+    (tmp_path / "rules.txt").write_text("Rule 1.1    Required\nScope test.\n", encoding="utf-8")
     with patch.object(ingest_mod, "Path", side_effect=lambda *a: _FakePath(*a)):
         rules = parse_misra_file("rules.txt")
 
@@ -314,6 +404,7 @@ def test_parse_misra_scope_is_always_misra_c_2023(tmp_path: Path):
 # ---------------------------------------------------------------------------
 # upload_to_mongodb
 # ---------------------------------------------------------------------------
+
 
 async def test_upload_to_mongodb_empty_rules_does_not_call_bulk_write():
     svc = _make_mongodb_service()
@@ -352,6 +443,7 @@ async def test_upload_to_mongodb_create_indexes_error_returns_early():
 # main()
 # ---------------------------------------------------------------------------
 
+
 async def test_main_with_parsed_rules_calls_upload_and_embed():
     """When parse_misra_file returns rules, main calls upload_to_mongodb and embed_and_store."""
     rules = [{"rule_type": "RULE", "section": 1, "rule_number": 1, "full_text": "Rule text"}]
@@ -361,8 +453,10 @@ async def test_main_with_parsed_rules_calls_upload_and_embed():
     mock_embedder = MagicMock()
     mock_embedder.embed_and_store = AsyncMock(return_value=42)
 
-    with patch("app.data.ingest.parse_misra_file", return_value=rules), \
-         patch("app.data.ingest.upload_to_mongodb", new=AsyncMock()) as mock_upload:
+    with (
+        patch("app.data.ingest.parse_misra_file", return_value=rules),
+        patch("app.data.ingest.upload_to_mongodb", new=AsyncMock()) as mock_upload,
+    ):
         result = await main(mock_mongodb, mock_pinecone, mock_embedder)
 
     mock_upload.assert_called_once_with(rules, mock_mongodb)
@@ -384,17 +478,16 @@ async def test_main_returns_zeros_when_no_rules_parsed():
 
 
 async def test_main_returns_correct_counts_for_multiple_rules():
-    rules = [
-        {"rule_type": "RULE", "section": i, "rule_number": i, "full_text": f"Rule {i}"}
-        for i in range(5)
-    ]
+    rules = [{"rule_type": "RULE", "section": i, "rule_number": i, "full_text": f"Rule {i}"} for i in range(5)]
     mock_mongodb = MagicMock()
     mock_pinecone = MagicMock()
     mock_embedder = MagicMock()
     mock_embedder.embed_and_store = AsyncMock(return_value=5)
 
-    with patch("app.data.ingest.parse_misra_file", return_value=rules), \
-         patch("app.data.ingest.upload_to_mongodb", new=AsyncMock()):
+    with (
+        patch("app.data.ingest.parse_misra_file", return_value=rules),
+        patch("app.data.ingest.upload_to_mongodb", new=AsyncMock()),
+    ):
         result = await main(mock_mongodb, mock_pinecone, mock_embedder)
 
     assert result["rules_ingested"] == 5
@@ -404,6 +497,7 @@ async def test_main_returns_correct_counts_for_multiple_rules():
 # ---------------------------------------------------------------------------
 # run_ingest_cli()
 # ---------------------------------------------------------------------------
+
 
 async def test_run_ingest_cli_uses_service_container_and_logs_result():
     """run_ingest_cli should enter the service container, call main, and log the result."""
@@ -421,8 +515,10 @@ async def test_run_ingest_cli_uses_service_container_and_logs_result():
 
     expected_result = {"rules_ingested": 3, "vectors_upserted": 3}
 
-    with patch("app.data.ingest.create_service_container", return_value=_fake_container()), \
-         patch("app.data.ingest.main", new=AsyncMock(return_value=expected_result)) as mock_main:
+    with (
+        patch("app.data.ingest.create_service_container", return_value=_fake_container()),
+        patch("app.data.ingest.main", new=AsyncMock(return_value=expected_result)) as mock_main,
+    ):
         await run_ingest_cli()
 
     mock_main.assert_called_once_with(

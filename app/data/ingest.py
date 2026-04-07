@@ -2,13 +2,15 @@
 Seed data ingestion script.
 Run with: python -m app.data.ingest
 """
+
+import asyncio
+import json
+import os
 import re
 import sys
-import os
-import json
-import asyncio
-from typing import Any
 from pathlib import Path
+from typing import Any
+
 from pymongo import ReplaceOne
 
 # Ensure project root is on the path
@@ -26,16 +28,16 @@ def parse_misra_file(filepath: str) -> list[dict]:
     Parses the MISRA C:2023 text file and extracts structured metadata.
     """
     rules = []
-    
+
     # Resolve the path relative to this script
     # app/data/ingest.py -> project root is 3 levels up
     base_dir = Path(__file__).resolve().parent.parent.parent
     file_path = base_dir / filepath
-    
+
     logger.info("📂 Attempting to read file", file_path=file_path)
 
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             lines = f.readlines()
     except FileNotFoundError:
         logger.error("Error: Could not find file", file_path=file_path)
@@ -44,24 +46,24 @@ def parse_misra_file(filepath: str) -> list[dict]:
     current_rule: dict[str, Any] | None = None
 
     # Regex to match lines like: "Rule 1.1    Required", "Dir 4.1\tRequired", or "Rule 22.15\tMandatory"
-    header_pattern = re.compile(r'^(Rule|Dir)\s+(\d+)\.(\d+)\s+(.+)$')
+    header_pattern = re.compile(r"^(Rule|Dir)\s+(\d+)\.(\d+)\s+(.+)$")
 
     for line in lines:
         line = line.strip()
 
         # Skip comments and empty lines
-        if not line or line.startswith('#'):
+        if not line or line.startswith("#"):
             continue
 
         header_match = header_pattern.match(line)
 
         if header_match:
             # If we were already building a rule, save it before starting a new one
-            if current_rule and current_rule.get('full_text'):
+            if current_rule and current_rule.get("full_text"):
                 rules.append(current_rule)
 
             # Extract metadata using regex groups
-            rule_type = header_match.group(1).upper()   # "RULE" or "DIR"
+            rule_type = header_match.group(1).upper()  # "RULE" or "DIR"
             section = int(header_match.group(2))
             rule_number = int(header_match.group(3))
             category = header_match.group(4).strip()
@@ -73,20 +75,20 @@ def parse_misra_file(filepath: str) -> list[dict]:
                 "section": section,
                 "rule_number": rule_number,
                 "category": category,
-                "full_text": ""
+                "full_text": "",
             }
         elif current_rule:
             # If it's not a header, it must be the rule text.
             # Append it to the current rule's full_text.
-            if current_rule["full_text"]: #multiple lines of text for a single rule
+            if current_rule["full_text"]:  # multiple lines of text for a single rule
                 current_rule["full_text"] += " " + line
             else:
                 current_rule["full_text"] = line
-                
+
     # Don't forget to add the very last rule in the file!
-    if current_rule and current_rule.get('full_text'):
+    if current_rule and current_rule.get("full_text"):
         rules.append(current_rule)
-        
+
     return rules
 
 
@@ -99,7 +101,7 @@ async def upload_to_mongodb(rules: list[dict], svc: MongoDBService):
     logger.info("Connecting to MongoDB Atlas...")
     try:
         await svc.create_indexes()
-    except Exception as e:
+    except Exception:
         logger.error("Error creating indexes in MongoDB")
         return
 
@@ -115,6 +117,7 @@ async def upload_to_mongodb(rules: list[dict], svc: MongoDBService):
         logger.info("✅ Successfully processed rules in MongoDB!", number_of_rules=len(rules))
         logger.info("   - Inserted:", number_inserted=result.upserted_count)
         logger.info("   - Modified:", number_modified=result.modified_count)
+
 
 async def main(mongodb: MongoDBService, pinecone: PineconeService, embedder: EmbeddingService) -> dict:
     # Test the parser
@@ -152,6 +155,7 @@ async def run_ingest_cli() -> None:
             embedder=container.embedding,
         )
         logger.info("Ingestion complete", **result)
+
 
 if __name__ == "__main__":  # pragma: no cover
     asyncio.run(run_ingest_cli())

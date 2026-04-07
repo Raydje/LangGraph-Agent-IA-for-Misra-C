@@ -1,18 +1,18 @@
 import asyncio
 from typing import Any
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
-from langchain_core.messages import SystemMessage, HumanMessage
+
+from app.config import get_settings
 from app.models.state import ComplianceState
 from app.services.llm_service import get_structured_llm
-from app.config import get_settings
-from app.utils import extracting_tokens_metadata,logger
+from app.utils import extracting_tokens_metadata, logger
 
 
 # Structured output schema — guarantees valid typed output from the LLM
 class ValidationOutput(BaseModel):
-    is_compliant: bool = Field(
-        description="True only if the code fully satisfies all applicable retrieved rules."
-    )
+    is_compliant: bool = Field(description="True only if the code fully satisfies all applicable retrieved rules.")
     validation_result: str = Field(
         description=(
             "Detailed explanation of each violation or confirmation of compliance. "
@@ -20,14 +20,9 @@ class ValidationOutput(BaseModel):
             "the format 'Rule ID (Category): ...' — e.g., 'Rule MISRA_15.5 (Required): ...'."
         )
     )
-    confidence_score: float = Field(
-        description="Float between 0.0 and 1.0 indicating confidence in the assessment."
-    )
+    confidence_score: float = Field(description="Float between 0.0 and 1.0 indicating confidence in the assessment.")
     cited_rules: list[str] = Field(
-        description=(
-            "List of MISRA C:2023 rule IDs used in the evaluation "
-            "(e.g., ['Rule MISRA_15.5', 'Dir 4.1'])."
-        )
+        description=("List of MISRA C:2023 rule IDs used in the evaluation (e.g., ['Rule MISRA_15.5', 'Dir 4.1']).")
     )
 
 
@@ -50,8 +45,10 @@ async def validation_node(state: ComplianceState) -> dict[str, Any]:
 
     # Format retrieved rules — MISRA C:2023 IDs are either "Dir X.Y" or "Rule MISRA_X.Y"
     rules_context = "\n\n".join(
-        [f"Rule ID: {r['rule_id']}\nCategory: {r.get('category', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"
-         for r in rules]
+        [
+            f"Rule ID: {r['rule_id']}\nCategory: {r.get('category', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"
+            for r in rules
+        ]
     )
 
     system_prompt = """You are a strict, expert compliance auditor for MISRA C:2023.
@@ -99,11 +96,8 @@ Provide your structured validation verdict."""
 
     # Use with_structured_output for guaranteed Pydantic-validated output
     try:
-        raw_result = await asyncio.wait_for(
-            structured_llm.ainvoke(messages),
-            timeout=settings.llm_timeout
-        )
-    except asyncio.TimeoutError:
+        raw_result = await asyncio.wait_for(structured_llm.ainvoke(messages), timeout=settings.llm_timeout)
+    except TimeoutError:
         logger.error("Validation LLM call timed out after seconds.", timeout=settings.llm_timeout)
         return {
             "validation_result": "Validation timed out: LLM did not respond in time.",
@@ -131,8 +125,15 @@ Provide your structured validation verdict."""
 
     # Track validation tokens used
     tokens_metadata = extracting_tokens_metadata(raw_result)  # Logs token usage and cost
-    logger.info("Validation_node_result", validation_result=result.validation_result, is_compliant=result.is_compliant, confidence_score=result.confidence_score, cited_rules=result.cited_rules, tokens_metadata=tokens_metadata)
-    
+    logger.info(
+        "Validation_node_result",
+        validation_result=result.validation_result,
+        is_compliant=result.is_compliant,
+        confidence_score=result.confidence_score,
+        cited_rules=result.cited_rules,
+        tokens_metadata=tokens_metadata,
+    )
+
     return {
         "validation_result": result.validation_result,
         "is_compliant": result.is_compliant,

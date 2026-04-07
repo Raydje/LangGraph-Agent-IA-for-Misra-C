@@ -1,10 +1,9 @@
-from typing import Type, TypeVar
-from pydantic import BaseModel
 from langchain_core.runnables import Runnable
 from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import BaseModel
+
 from app.config import get_settings
 
-T = TypeVar('T', bound=BaseModel)
 
 def get_llm(temperature: float = 0.7, timeout: int = 120) -> ChatGoogleGenerativeAI:
     """
@@ -19,8 +18,9 @@ def get_llm(temperature: float = 0.7, timeout: int = 120) -> ChatGoogleGenerativ
         request_timeout=timeout,
     )
 
-def get_structured_llm(
-    response_schema: Type[T],
+
+def get_structured_llm[T: BaseModel](
+    response_schema: type[T],
     temperature: float = 0.0,
     timeout: int = 120,
     raw_bool: bool = True,

@@ -8,6 +8,7 @@ The index attribute is replaced with a MagicMock in each test.
 asyncio.to_thread is patched module-wide so the session-scoped event loop
 never spawns real thread-pool coroutines (avoids pytest-asyncio teardown warnings).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,15 +18,16 @@ import pytest
 
 from app.services.pinecone_service import PineconeService
 
-
 # ---------------------------------------------------------------------------
 # Module-wide to_thread shim — keeps tests in-loop, no real threads
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def patch_to_thread():
     async def _fake(func, *args, **kwargs):
         return func(*args, **kwargs)
+
     with patch("app.services.pinecone_service.asyncio.to_thread", new=_fake):
         yield
 
@@ -33,6 +35,7 @@ def patch_to_thread():
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_service() -> PineconeService:
     """Instantiate PineconeService without calling __init__."""
@@ -43,16 +46,14 @@ def _make_service() -> PineconeService:
 
 def _pinecone_matches(*id_score_pairs: tuple[str, float]) -> MagicMock:
     result = MagicMock()
-    result.matches = [
-        MagicMock(id=rid, score=score, metadata={"rule": rid})
-        for rid, score in id_score_pairs
-    ]
+    result.matches = [MagicMock(id=rid, score=score, metadata={"rule": rid}) for rid, score in id_score_pairs]
     return result
 
 
 # ---------------------------------------------------------------------------
 # query
 # ---------------------------------------------------------------------------
+
 
 async def test_query_happy_path_returns_matches():
     svc = _make_service()
@@ -83,8 +84,7 @@ async def test_query_timeout_returns_empty_matches():
     svc = _make_service()
 
     # Simulate asyncio.wait_for raising TimeoutError
-    with patch("app.services.pinecone_service.asyncio.wait_for",
-               side_effect=asyncio.TimeoutError):
+    with patch("app.services.pinecone_service.asyncio.wait_for", side_effect=asyncio.TimeoutError):
         result = await svc.query(vector=[0.1] * 768)
 
     assert result == {"matches": []}
@@ -93,6 +93,7 @@ async def test_query_timeout_returns_empty_matches():
 # ---------------------------------------------------------------------------
 # upsert_vectors
 # ---------------------------------------------------------------------------
+
 
 async def test_upsert_vectors_returns_total_count():
     svc = _make_service()
@@ -133,6 +134,7 @@ async def test_upsert_vectors_empty_list_returns_zero():
 # PineconeService.__init__
 # ---------------------------------------------------------------------------
 
+
 def test_init_uses_existing_index_without_creating():
     """When index already exists in list_indexes, create_index must NOT be called."""
     mock_settings = MagicMock()
@@ -146,8 +148,10 @@ def test_init_uses_existing_index_without_creating():
     mock_pc.list_indexes.return_value = [existing_idx]
     mock_pc.Index.return_value = MagicMock()
 
-    with patch("app.services.pinecone_service.get_settings", return_value=mock_settings), \
-         patch("app.services.pinecone_service.Pinecone", return_value=mock_pc):
+    with (
+        patch("app.services.pinecone_service.get_settings", return_value=mock_settings),
+        patch("app.services.pinecone_service.Pinecone", return_value=mock_pc),
+    ):
         svc = PineconeService()
 
     mock_pc.create_index.assert_not_called()
@@ -167,9 +171,11 @@ def test_init_creates_index_when_not_existing():
     mock_pc.list_indexes.return_value = []  # index does not exist
     mock_pc.Index.return_value = MagicMock()
 
-    with patch("app.services.pinecone_service.get_settings", return_value=mock_settings), \
-         patch("app.services.pinecone_service.Pinecone", return_value=mock_pc), \
-         patch("app.services.pinecone_service.ServerlessSpec") as mock_spec:
+    with (
+        patch("app.services.pinecone_service.get_settings", return_value=mock_settings),
+        patch("app.services.pinecone_service.Pinecone", return_value=mock_pc),
+        patch("app.services.pinecone_service.ServerlessSpec"),
+    ):
         svc = PineconeService()
 
     mock_pc.create_index.assert_called_once()

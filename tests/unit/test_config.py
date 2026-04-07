@@ -6,26 +6,28 @@ Settings uses pydantic-settings which reads env vars as fallback.
 Required-field tests temporarily remove the relevant env var so validation
 fires correctly, then restore it.
 """
+
 from __future__ import annotations
 
 import os
+
 import pytest
 from pydantic import ValidationError
 
 from app.config import Settings
 
-
-_REQUIRED = dict(
-    gemini_api_key="g-key",
-    pinecone_api_key="p-key",
-    mongodb_uri="mongodb://localhost/test",
-    jwt_secret_key="jwt-secret",
-)
+_REQUIRED = {
+    "gemini_api_key": "g-key",
+    "pinecone_api_key": "p-key",
+    "mongodb_uri": "mongodb://localhost/test",
+    "jwt_secret_key": "jwt-secret",
+}
 
 
 # ---------------------------------------------------------------------------
 # Required fields — env vars must be absent for validation to fire
 # ---------------------------------------------------------------------------
+
 
 def test_settings_instantiates_with_all_required_fields():
     s = Settings(**_REQUIRED)
@@ -85,6 +87,7 @@ def test_settings_missing_mongodb_uri_raises():
 # Defaults
 # ---------------------------------------------------------------------------
 
+
 def test_settings_default_gemini_model():
     s = Settings(**_REQUIRED)
     assert s.gemini_model == "gemini-2.5-flash"
@@ -104,20 +107,21 @@ def test_settings_default_cors_origins_contain_localhost():
 # redis_uri property
 # ---------------------------------------------------------------------------
 
+
 def test_redis_uri_no_auth_returns_plain_url():
     s = Settings(**_REQUIRED, redis_host="myredis", redis_port=6380, redis_password="")
     assert s.redis_uri == "redis://myredis:6380"
 
 
 def test_redis_uri_with_password_includes_credentials():
-    s = Settings(**_REQUIRED, redis_host="myredis", redis_port=6379,
-                 redis_user="admin", redis_password="secret")
+    s = Settings(**_REQUIRED, redis_host="myredis", redis_port=6379, redis_user="admin", redis_password="secret")
     assert "admin:secret@myredis" in s.redis_uri
 
 
 # ---------------------------------------------------------------------------
 # set_model_pricing validator
 # ---------------------------------------------------------------------------
+
 
 def test_known_model_populates_pricing():
     s = Settings(**_REQUIRED, gemini_model="gemini-2.5-flash")

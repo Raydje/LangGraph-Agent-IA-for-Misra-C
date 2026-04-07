@@ -27,3 +27,5 @@ types-python-jose
 bcrypt==5.0.0
 python-multipart==0.0.22
 email-validator==2.3.0
+ruff==0.3.5
+pre-commit==3.7.0

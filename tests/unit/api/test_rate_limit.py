@@ -6,6 +6,7 @@ Tests both enforce_user_rate_limit and enforce_user_budget dependencies
 with mocked Redis, mocked UsageService, and pre-built Principal objects.
 No real network calls are made.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -13,13 +14,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.api.rate_limit import enforce_user_rate_limit, enforce_user_budget
+from app.api.rate_limit import enforce_user_budget, enforce_user_rate_limit
 from app.auth.models import Principal
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _principal(scopes: list[str] | None = None) -> Principal:
     return Principal(
@@ -79,6 +80,7 @@ def _make_usage_service(within_budget: bool = True, current_cost: float = 0.0) -
 # enforce_user_rate_limit — admin bypass
 # ---------------------------------------------------------------------------
 
+
 async def test_rate_limit_admin_bypasses_redis():
     redis = _make_redis()
     request = _make_request(redis_client=redis)
@@ -92,6 +94,7 @@ async def test_rate_limit_admin_bypasses_redis():
 # ---------------------------------------------------------------------------
 # enforce_user_rate_limit — within limit
 # ---------------------------------------------------------------------------
+
 
 async def test_rate_limit_within_limit_does_not_raise():
     redis = _make_redis(zcard_result=5)  # 5 requests, limit is 20
@@ -119,6 +122,7 @@ async def test_rate_limit_sets_response_headers():
 # ---------------------------------------------------------------------------
 # enforce_user_rate_limit — over limit
 # ---------------------------------------------------------------------------
+
 
 async def test_rate_limit_exceeded_raises_429():
     redis = _make_redis(zcard_result=20)  # At limit of 20
@@ -151,6 +155,7 @@ async def test_rate_limit_exceeded_sets_retry_after_header():
 # enforce_user_rate_limit — Redis unavailable (graceful degradation)
 # ---------------------------------------------------------------------------
 
+
 async def test_rate_limit_no_redis_degrades_gracefully():
     """When Redis is None, request should be allowed without error."""
     request = _make_request(redis_client=None)
@@ -180,6 +185,7 @@ async def test_rate_limit_redis_exception_degrades_gracefully():
 # enforce_user_budget — admin bypass
 # ---------------------------------------------------------------------------
 
+
 async def test_budget_admin_bypasses_check():
     svc = _make_usage_service()
     request = _make_request(usage_service=svc)
@@ -193,6 +199,7 @@ async def test_budget_admin_bypasses_check():
 # ---------------------------------------------------------------------------
 # enforce_user_budget — within budget
 # ---------------------------------------------------------------------------
+
 
 async def test_budget_within_limit_does_not_raise():
     svc = _make_usage_service(within_budget=True, current_cost=1.5)
@@ -221,6 +228,7 @@ async def test_budget_sets_response_headers():
 # ---------------------------------------------------------------------------
 # enforce_user_budget — over budget
 # ---------------------------------------------------------------------------
+
 
 async def test_budget_exceeded_raises_429():
     svc = _make_usage_service(within_budget=False, current_cost=5.5)
@@ -255,6 +263,7 @@ async def test_budget_exceeded_remaining_header_is_zero():
 # ---------------------------------------------------------------------------
 # enforce_user_budget — graceful degradation
 # ---------------------------------------------------------------------------
+
 
 async def test_budget_no_usage_service_degrades_gracefully():
     """When usage_service is not on app.state, request should be allowed."""

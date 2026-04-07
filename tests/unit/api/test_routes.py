@@ -6,6 +6,7 @@ Strategy: call route handler functions directly with a mocked Request and
 pre-built Principal.  All FastAPI dependencies (graph, services, principal)
 are passed as explicit arguments — no DI container involved.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -31,6 +32,7 @@ get_usage = _routes_mod.get_usage.__wrapped__
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _principal(scopes: list[str] | None = None) -> Principal:
     return Principal(
@@ -111,6 +113,7 @@ def _mock_index(stats_raises: bool = False) -> MagicMock:
 # GET /health
 # ---------------------------------------------------------------------------
 
+
 async def test_health_check_healthy_when_both_services_ok():
     result = await health_check(_make_request(), db=_mock_db(), index=_mock_index())
     assert result.status == "healthy"
@@ -142,6 +145,7 @@ async def test_health_check_none_services_marks_degraded():
 # ---------------------------------------------------------------------------
 # POST /query
 # ---------------------------------------------------------------------------
+
 
 async def test_query_compliance_happy_path_returns_response():
     from app.api.v1.requests import ComplianceQueryRequest
@@ -192,9 +196,7 @@ async def test_query_compliance_thread_id_preserved_when_provided():
     from app.api.v1.requests import ComplianceQueryRequest
 
     graph = _make_graph()
-    body = ComplianceQueryRequest(
-        query="Test?", standard="MISRA C:2023", thread_id="my-thread-123"
-    )
+    body = ComplianceQueryRequest(query="Test?", standard="MISRA C:2023", thread_id="my-thread-123")
 
     result = await query_compliance(
         request=_make_request(),
@@ -214,6 +216,7 @@ async def test_query_compliance_thread_id_preserved_when_provided():
 # ---------------------------------------------------------------------------
 # POST /seed
 # ---------------------------------------------------------------------------
+
 
 async def test_seed_database_calls_ingest_and_returns_response():
     with patch("app.api.v1.routes.ingest", new_callable=AsyncMock) as mock_ingest:
@@ -236,6 +239,7 @@ async def test_seed_database_calls_ingest_and_returns_response():
 # ---------------------------------------------------------------------------
 # POST /replay/{thread_id}/{checkpoint_id}
 # ---------------------------------------------------------------------------
+
 
 async def test_replay_happy_path_returns_response():
     graph = _make_graph()
@@ -280,6 +284,7 @@ async def test_replay_missing_checkpoint_raises_404():
 # ---------------------------------------------------------------------------
 # GET /history/{thread_id}
 # ---------------------------------------------------------------------------
+
 
 async def test_get_thread_history_returns_history():
     graph = MagicMock()
@@ -331,6 +336,7 @@ async def test_get_thread_history_empty_raises_404():
 # GET /usage
 # ---------------------------------------------------------------------------
 
+
 async def test_get_usage_returns_usage_data():
     usage_service = _make_usage_service()
     mock_data = {
@@ -351,9 +357,9 @@ async def test_get_usage_returns_usage_data():
                 "estimated_cost": 0.003,
                 "critique_iterations": 2,
                 "nodes_visited": ["orchestrator", "rag", "validation", "critique", "validation"],
-                "status_code": 200
+                "status_code": 200,
             }
-        ]
+        ],
     }
     usage_service.get_user_usage = AsyncMock(return_value=mock_data)
 
@@ -390,6 +396,7 @@ async def test_get_usage_user_not_found_raises_404():
 # ---------------------------------------------------------------------------
 # _build_response (pure function)
 # ---------------------------------------------------------------------------
+
 
 def test_build_response_maps_result_to_response():
     response = _build_response("thread-xyz", _minimal_result())

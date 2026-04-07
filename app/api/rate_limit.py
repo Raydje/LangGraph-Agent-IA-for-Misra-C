@@ -24,7 +24,7 @@ from __future__ import annotations
 import time
 import uuid
 
-from fastapi import Depends, HTTPException, Request, Response, Security
+from fastapi import HTTPException, Request, Response, Security
 
 from app.auth.dependencies import get_current_principal
 from app.auth.models import Principal
@@ -32,10 +32,10 @@ from app.config import get_settings
 from app.services.usage_service import UsageService
 from app.utils import logger
 
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _is_admin(principal: Principal) -> bool:
     return "admin:all" in principal.scopes
@@ -44,6 +44,7 @@ def _is_admin(principal: Principal) -> bool:
 # ---------------------------------------------------------------------------
 # enforce_user_rate_limit
 # ---------------------------------------------------------------------------
+
 
 async def enforce_user_rate_limit(
     request: Request,
@@ -131,6 +132,7 @@ async def enforce_user_rate_limit(
 # enforce_user_budget
 # ---------------------------------------------------------------------------
 
+
 async def enforce_user_budget(
     request: Request,
     response: Response,
@@ -164,9 +166,7 @@ async def enforce_user_budget(
         return
 
     try:
-        is_within_budget, current_cost = await usage_service.check_budget(
-            principal.user_id, max_budget
-        )
+        is_within_budget, current_cost = await usage_service.check_budget(principal.user_id, max_budget)
     except Exception as exc:
         logger.warning(
             "[BudgetCheck] Budget check failed, allowing request",
@@ -185,7 +185,7 @@ async def enforce_user_budget(
             "[BudgetCheck] User exceeded budget",
             user_id=principal.user_id,
             current_cost=current_cost,
-            max_budget=max_budget
+            max_budget=max_budget,
         )
         raise HTTPException(
             status_code=429,

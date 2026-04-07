@@ -15,8 +15,7 @@ Lifecycle:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -59,13 +58,13 @@ class UsageService:
         user_id: str,
         endpoint: str,
         method: str,
-        thread_id: Optional[str],
+        thread_id: str | None,
         prompt_tokens: int,
         completion_tokens: int,
         total_tokens: int,
         estimated_cost: float,
         critique_iterations: int = 0,
-        nodes_visited: Optional[list[str]] = None,
+        nodes_visited: list[str] | None = None,
         status_code: int,
     ) -> None:
         """Persist one usage log entry and atomically update the user's running totals.
@@ -76,15 +75,16 @@ class UsageService:
             failure (log inserted, user not updated) is recoverable via
             re-aggregation from usage_logs.  A transaction would require a
             replica set, which is not assumed in the local dev environment.
-        
+
         Additional metadata: critique_iterations (number of critique loops),
+
         nodes_visited (list of graph node names executed in order).
         """
         log_entry = {
             "user_id": user_id,
             "endpoint": endpoint,
             "method": method,
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
             "thread_id": thread_id,
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
@@ -131,12 +131,7 @@ class UsageService:
         if user is None:
             return {}
 
-        cursor = (
-            self._db["usage_logs"]
-            .find({"user_id": user_id}, {"_id": 0})
-            .sort("timestamp", -1)
-            .limit(20)
-        )
+        cursor = self._db["usage_logs"].find({"user_id": user_id}, {"_id": 0}).sort("timestamp", -1).limit(20)
         recent_logs = await cursor.to_list(length=20)
 
         return {

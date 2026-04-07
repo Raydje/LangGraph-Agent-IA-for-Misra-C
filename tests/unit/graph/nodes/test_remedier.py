@@ -1,15 +1,14 @@
 # tests/unit/graph/nodes/test_remedier.py
 
 import asyncio
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.graph.nodes.remedier import remediate_code, RemediationOutput
-
+from app.graph.nodes.remedier import RemediationOutput, remediate_code
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_state(
     code_snippet: str = "char *p = malloc(n);",
@@ -39,11 +38,13 @@ def _mock_structured_llm(
     raw.usage_metadata = {"input_tokens": input_tokens, "output_tokens": output_tokens}
 
     structured_chain = MagicMock()
-    structured_chain.ainvoke = AsyncMock(return_value={
-        "raw": raw,
-        "parsed": parsed,
-        "parsing_error": None if parsed else ValueError("parse failed"),
-    })
+    structured_chain.ainvoke = AsyncMock(
+        return_value={
+            "raw": raw,
+            "parsed": parsed,
+            "parsing_error": None if parsed else ValueError("parse failed"),
+        }
+    )
     return structured_chain
 
 
@@ -56,6 +57,7 @@ VALID_OUTPUT = RemediationOutput(
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 @patch("app.graph.nodes.remedier.get_structured_llm")
 async def test_happy_path_returns_fixed_code(mock_get_structured_llm):
@@ -116,7 +118,8 @@ async def test_only_cited_rules_appear_in_llm_context(mock_get_structured_llm):
 
     call_args = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
     human_content = next(
-        m.content for m in call_args
+        m.content
+        for m in call_args
         if hasattr(m, "content") and ("Cited rule" in m.content or "Uncited rule" in m.content)
     )
     assert "Cited rule" in human_content
@@ -135,7 +138,11 @@ async def test_fallback_to_all_rules_when_no_cited_match(mock_get_structured_llm
     await remediate_code(state)
 
     call_args = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
-    human_content = next(m.content for m in call_args if hasattr(m, "content") and ("Fallback rule" in m.content or "No rule details" in m.content))
+    human_content = next(
+        m.content
+        for m in call_args
+        if hasattr(m, "content") and ("Fallback rule" in m.content or "No rule details" in m.content)
+    )
     assert "Fallback rule" in human_content
 
 
@@ -148,7 +155,9 @@ async def test_no_retrieved_rules_uses_default_message(mock_get_structured_llm):
     await remediate_code(state)
 
     call_args = mock_get_structured_llm.return_value.ainvoke.call_args[0][0]
-    human_content = next(m.content for m in call_args if hasattr(m, "content") and "No rule details available" in m.content)
+    human_content = next(
+        m.content for m in call_args if hasattr(m, "content") and "No rule details available" in m.content
+    )
     assert "No rule details available." in human_content
 
 
@@ -177,11 +186,13 @@ async def test_token_counts_from_usage_metadata(mock_get_structured_llm):
 async def test_missing_usage_metadata_defaults_to_zero(mock_get_structured_llm):
     raw = MagicMock(spec=[])  # no usage_metadata attribute
     structured_chain = MagicMock()
-    structured_chain.ainvoke = AsyncMock(return_value={
-        "raw": raw,
-        "parsed": VALID_OUTPUT,
-        "parsing_error": None,
-    })
+    structured_chain.ainvoke = AsyncMock(
+        return_value={
+            "raw": raw,
+            "parsed": VALID_OUTPUT,
+            "parsing_error": None,
+        }
+    )
     mock_get_structured_llm.return_value = structured_chain
 
     result = await remediate_code(_make_state())
@@ -202,7 +213,7 @@ async def test_get_structured_llm_called_with_remediation_output_schema(mock_get
 
 @patch("app.graph.nodes.remedier.get_structured_llm")
 async def test_llm_invoked_with_system_and_human_messages(mock_get_structured_llm):
-    from langchain_core.messages import SystemMessage, HumanMessage
+    from langchain_core.messages import HumanMessage, SystemMessage
 
     mock_get_structured_llm.return_value = _mock_structured_llm(VALID_OUTPUT)
 
@@ -250,4 +261,3 @@ async def test_timeout_returns_original_code_and_zero_tokens(mock_get_structured
     assert result["completion_tokens"] == 0
     assert result["total_tokens"] == 0
     assert result["estimated_cost"] == 0.0
-

@@ -69,10 +69,9 @@ async def test_rag_returns_rules_for_goto_query(rag_config):
     result = await rag_node(state, rag_config)
 
     retrieved = result.get("retrieved_rules", [])
-    assert len(retrieved) >= 1, (
-        "Expected at least 1 retrieved rule for a goto-related query against "
-        "the live MISRA C:2023 Pinecone index."
-    )
+    assert (
+        len(retrieved) >= 1
+    ), "Expected at least 1 retrieved rule for a goto-related query against the live MISRA C:2023 Pinecone index."
 
     # Every rule must conform to the RetrievedRule TypedDict shape
     for rule in retrieved:
@@ -80,9 +79,7 @@ async def test_rag_returns_rules_for_goto_query(rag_config):
 
     # Results must be sorted by descending relevance score
     scores = [r["relevance_score"] for r in retrieved]
-    assert scores == sorted(scores, reverse=True), (
-        "Retrieved rules are not sorted by descending relevance score."
-    )
+    assert scores == sorted(scores, reverse=True), "Retrieved rules are not sorted by descending relevance score."
 
     # Metadata state fields must be populated
     assert result.get("rag_query_used") == state["query"]
@@ -109,16 +106,13 @@ async def test_rag_returns_rules_for_pointer_cast_query(rag_config):
     result = await rag_node(state, rag_config)
 
     retrieved = result.get("retrieved_rules", [])
-    assert len(retrieved) >= 1, (
-        "Expected at least 1 retrieved rule for a pointer-cast query."
-    )
+    assert len(retrieved) >= 1, "Expected at least 1 retrieved rule for a pointer-cast query."
 
     for rule in retrieved:
         _assert_rule_shape(rule)
 
     # All retrieved rules must belong to the requested standard
     for rule in retrieved:
-        assert rule["standard"] == "MISRA C:2023", (
-            f"Rule {rule['rule_id']} has standard='{rule['standard']}', "
-            "expected 'MISRA C:2023'."
-        )
+        assert (
+            rule["standard"] == "MISRA C:2023"
+        ), f"Rule {rule['rule_id']} has standard='{rule['standard']}', expected 'MISRA C:2023'."

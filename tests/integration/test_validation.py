@@ -45,10 +45,7 @@ _RULE_10_4 = {
 _RULE_8_4 = {
     "rule_id": "Rule MISRA_8.4",
     "category": "Required",
-    "title": (
-        "A compatible declaration shall be visible when an object or function "
-        "with external linkage is defined"
-    ),
+    "title": ("A compatible declaration shall be visible when an object or function with external linkage is defined"),
     "full_text": (
         "If a function is defined, there must be a prototype in an included header "
         "or earlier in the file to ensure type safety across translation units."

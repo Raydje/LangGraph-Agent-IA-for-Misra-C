@@ -5,6 +5,7 @@ Unit tests for app/services/embedding_service.py.
 Uses object.__new__ to bypass __init__ (avoids real GoogleGenerativeAIEmbeddings
 instantiation). The embeddings attribute is replaced with an AsyncMock.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -12,10 +13,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.embedding_service import EmbeddingService
 from app.services.pinecone_service import PineconeService
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_service(embedding_vector: list[float] | None = None) -> EmbeddingService:
     """Bypass __init__ and inject a mock embeddings client."""
@@ -50,6 +51,7 @@ def _make_rule(section: int = 1, rule_number: int = 1, rule_type: str = "RULE") 
 # get_embedding
 # ---------------------------------------------------------------------------
 
+
 async def test_get_embedding_delegates_to_aembed_query():
     vec = [0.5] * 768
     svc = _make_service(embedding_vector=vec)
@@ -63,6 +65,7 @@ async def test_get_embedding_delegates_to_aembed_query():
 # ---------------------------------------------------------------------------
 # embed_and_store
 # ---------------------------------------------------------------------------
+
 
 async def test_embed_and_store_empty_rules_returns_zero():
     svc = _make_service()
@@ -136,6 +139,7 @@ async def test_embed_and_store_uses_full_text_for_embedding():
 # EmbeddingService.__init__
 # ---------------------------------------------------------------------------
 
+
 def test_init_creates_embeddings_from_settings():
     mock_settings = MagicMock()
     mock_settings.gemini_embedding_model = "models/text-embedding-004"
@@ -144,9 +148,12 @@ def test_init_creates_embeddings_from_settings():
 
     mock_embeddings_instance = MagicMock()
 
-    with patch("app.services.embedding_service.get_settings", return_value=mock_settings), \
-         patch("app.services.embedding_service.GoogleGenerativeAIEmbeddings",
-               return_value=mock_embeddings_instance) as mock_cls:
+    with (
+        patch("app.services.embedding_service.get_settings", return_value=mock_settings),
+        patch(
+            "app.services.embedding_service.GoogleGenerativeAIEmbeddings", return_value=mock_embeddings_instance
+        ) as mock_cls,
+    ):
         svc = EmbeddingService()
 
     mock_cls.assert_called_once_with(

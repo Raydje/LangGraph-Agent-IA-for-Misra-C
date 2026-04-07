@@ -1,14 +1,15 @@
 # tests/unit/graph/nodes/test_rag.py
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from app.graph.nodes.rag import rag_node
+import pytest
 
+from app.graph.nodes.rag import rag_node
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_state(query: str = "check pointer arithmetic") -> dict:
     return {"query": query}
@@ -37,12 +38,7 @@ def _make_config(embed_return, pinecone_return, mongo_return=None):
 
 def _pinecone_result(*rule_ids_and_scores: tuple[str, float]) -> dict:
     """Build a minimal Pinecone response dict."""
-    return {
-        "matches": [
-            {"id": rid, "score": score}
-            for rid, score in rule_ids_and_scores
-        ]
-    }
+    return {"matches": [{"id": rid, "score": score} for rid, score in rule_ids_and_scores]}
 
 
 def _mongo_doc(
@@ -68,6 +64,7 @@ FAKE_VECTOR = [0.1] * 768
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 async def test_happy_path_returns_retrieved_rules():
     config, _, _, _ = _make_config(
@@ -232,6 +229,7 @@ async def test_empty_query_string_is_handled():
 # ---------------------------------------------------------------------------
 # None-guard tests (lines 22-27)
 # ---------------------------------------------------------------------------
+
 
 async def test_raises_value_error_if_embedding_service_is_none():
     config = {"configurable": {"embedding_service": None, "pinecone_service": MagicMock(), "mongo_db": MagicMock()}}

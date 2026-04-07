@@ -5,10 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
-
 # ---------------------------------------------------------------------------
 # Inbound request bodies
 # ---------------------------------------------------------------------------
+
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -31,6 +31,7 @@ class RefreshRequest(BaseModel):
 # Outbound response bodies
 # ---------------------------------------------------------------------------
 
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
@@ -40,6 +41,7 @@ class TokenResponse(BaseModel):
 
 class APIKeyResponse(BaseModel):
     """Returned once at creation time — full_key is never retrievable again."""
+
     key_id: str
     name: str
     full_key: str
@@ -49,6 +51,7 @@ class APIKeyResponse(BaseModel):
 
 class APIKeyInfo(BaseModel):
     """Safe listing representation — no secret material."""
+
     key_id: str
     name: str
     scopes: list[str]
@@ -62,8 +65,10 @@ class APIKeyInfo(BaseModel):
 # Internal / dependency injection
 # ---------------------------------------------------------------------------
 
+
 class Principal(BaseModel):
     """Resolved identity propagated through authenticated request handlers."""
+
     user_id: str
     email: str
     scopes: list[str]

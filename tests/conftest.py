@@ -14,8 +14,9 @@ os.environ.setdefault("PINECONE_API_KEY", "test-fake-pinecone-key")
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/test_db")
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-insecure-jwt-secret-do-not-use-in-prod")
 
-import pytest  # noqa: E402
 from unittest.mock import patch  # noqa: E402
+
+import pytest  # noqa: E402
 
 from app.config import Settings, get_settings  # noqa: E402
 
@@ -51,6 +52,6 @@ def override_settings():
     test_settings = _build_test_settings()
     get_settings.cache_clear()
     with patch.object(get_settings, "__wrapped__", return_value=test_settings):
-        get_settings.cache_clear()   # force re-population via the patched __wrapped__
+        get_settings.cache_clear()  # force re-population via the patched __wrapped__
         yield test_settings
     get_settings.cache_clear()
