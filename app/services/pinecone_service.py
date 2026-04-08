@@ -9,21 +9,27 @@ from app.utils import logger
 class PineconeService:
     def __init__(self) -> None:
         settings = get_settings()
-        pc = Pinecone(api_key=settings.pinecone_api_key)
+        try:
+            pc = Pinecone(api_key=settings.pinecone_api_key)
 
-        existing = [idx.name for idx in pc.list_indexes()]
-        if settings.pinecone_index_name not in existing:
-            pc.create_index(
-                name=settings.pinecone_index_name,
-                dimension=settings.embedding_dimensions,
-                metric="cosine",
-                spec=ServerlessSpec(
-                    cloud=settings.pinecone_cloud,
-                    region=settings.pinecone_region,
-                ),
-            )
+            existing = [idx.name for idx in pc.list_indexes()]
+            if settings.pinecone_index_name not in existing:
+                pc.create_index(
+                    name=settings.pinecone_index_name,
+                    dimension=settings.embedding_dimensions,
+                    metric="cosine",
+                    spec=ServerlessSpec(
+                        cloud=settings.pinecone_cloud,
+                        region=settings.pinecone_region,
+                    ),
+                )
 
-        self.index = pc.Index(settings.pinecone_index_name)
+            self.index = pc.Index(settings.pinecone_index_name)
+            logger.info("[Startup] Pinecone connected", index=settings.pinecone_index_name)
+        except Exception as e:
+            logger.warning(
+                "[Startup] Pinecone unavailable — starting in degraded mode")
+            self.index = None
 
     async def query(
         self,

@@ -20,7 +20,8 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       # Override .env default of "localhost" — inside Docker the service name is the hostname
       REDIS_HOST: redis

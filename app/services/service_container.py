@@ -40,5 +40,6 @@ async def create_service_container() -> AsyncIterator[ServiceContainer]:
         yield container
     finally:
         container.mongodb.close()
-        container.pinecone.index.close()
+        if container.pinecone.index is not None:
+            container.pinecone.index.close()
         container.mongodb_checkpoint.close()
