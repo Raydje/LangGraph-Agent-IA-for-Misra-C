@@ -47,6 +47,18 @@ spec:
         app.kubernetes.io/name: misra-c-agent
         app.kubernetes.io/component: api
     spec:
+      # Anti-affinity ensures that the orchestrator attempts to schedule replicas on different nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: misra-c-agent
+                    app.kubernetes.io/component: api
+                topologyKey: kubernetes.io/hostname
+
       # Ensure replicas are spread across different nodes for true HA.
       # If only one node is available, the scheduler will still place both pods
       # (whenUnsatisfiable: ScheduleAnyway), but prefers spreading them.
@@ -70,7 +82,7 @@ spec:
           # exact SHA tag produced by the docker-push CI job:
           #   kubectl set image deployment/misra-c-agent-api \
           #     api=ghcr.io/<owner>/<repo>:<sha> -n misra-c-agent
-          image: ghcr.io/raydje/langgraph-agent-ia-for-misra-c:latest
+          image: ghcr.io/raydje/langgraph-agent-ia-for-misra-c:0.1.0
           imagePullPolicy: Always
           ports:
             - name: http
