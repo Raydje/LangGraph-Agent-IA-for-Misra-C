@@ -1,0 +1,13 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# namespace.yaml
+#
+# Isolates all MISRA C Agent resources in a dedicated namespace.
+# Apply first: kubectl apply -f deploy/k8s/namespace.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: misra-c-agent
+  labels:
+    app.kubernetes.io/name: misra-c-agent
+    app.kubernetes.io/managed-by: kubectl
