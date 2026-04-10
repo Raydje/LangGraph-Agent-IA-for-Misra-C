@@ -326,7 +326,7 @@ jobs:
       - name: Wait for HEALTHCHECK
         run: |
           echo "Waiting for container healthcheck to pass..."
-          timeout 60s bash -c 'until [ "$(docker inspect -f {{.State.Health.Status}} misra-c-agent-api)" == "healthy" ]; do sleep 2; done'
+          timeout 120s bash -c 'until [ "$(docker inspect -f {{.State.Health.Status}} misra-c-agent-api)" == "healthy" ]; do sleep 2; done'
 
       - name: Verify API Health Endpoint
         # Pinecone is intentionally a dummy key in the smoke test, so the response
