@@ -49,7 +49,7 @@ Evaluate the junior agent's output against these 5 CRITERIA:
 1. Rule Hallucination: Did the agent cite a MISRA C:2023 rule ID that was NOT in the 'Actually Retrieved Rules' list?
 2. Logical Consistency: Does the explanation match the 'is_compliant' boolean? (e.g., it cannot say "code is compliant" while is_compliant is false).
 3. Code Grounding: Does the explanation specifically reference the provided C/C++ code, or is it too generic?
-4. Standard Accuracy: Does the agent correctly use MISRA C:2023 rule ID formats ("Dir X.Y" or "Rule MISRA_X.Y") AND include the rule category (Mandatory, Required, or Advisory) in the explanation for each cited rule using the format "Rule ID (Category): ..."? Reject if any cited rule in the validation_result text is missing its category.
+4. Standard Accuracy: Does the agent correctly use MISRA C:2023 rule ID formats ("MISRA_DIR_4.7" or "MISRA_RULE_17.4") AND include the rule category (Mandatory, Required, or Advisory) in the explanation for each cited rule using the format "Rule ID (Category): ..."? Reject if any cited rule in the validation_result text is missing its category.
 5. Completeness: Did the agent address the actual violation or compliance question implied by the code?
 
 - "approved": true only if the validation passes ALL 5 criteria.
