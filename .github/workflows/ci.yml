@@ -307,19 +307,17 @@ jobs:
         run: docker load --input /tmp/misra-c-agent.tar
 
       - name: Create .env file
-        # Satisfies older Docker Compose versions that do not support required: false.
-        # No secrets needed — env vars are injected via the env: block below.
-        run: touch .env
+        run: |
+          cat > .env <<'EOF'
+          MONGODB_URI=mongodb://mongodb:27017/test
+          PINECONE_API_KEY=dummy
+          GEMINI_API_KEY=dummy
+          JWT_SECRET_KEY=dummy-smoke-test-jwt-secret
+          EOF
 
       - name: Start stack
         env:
           APP_IMAGE: misra-c-agent:${{ github.sha }}
-          # Local containerised MongoDB — no Atlas connection needed for a smoke test.
-          MONGODB_URI: "mongodb://mongodb:27017/test"
-          # Pinecone is intentionally disconnected; app starts in degraded mode.
-          PINECONE_API_KEY: "dummy"
-          GEMINI_API_KEY: "dummy"
-          JWT_SECRET_KEY: "dummy-smoke-test-jwt-secret"
         run: |
           docker compose up -d api
 
