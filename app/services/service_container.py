@@ -1,15 +1,16 @@
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator
 
-from app.services.mongodb_service import MongoDBService, MongoDBCheckpointService
-from app.services.pinecone_service import PineconeService
 from app.services.embedding_service import EmbeddingService
+from app.services.mongodb_service import MongoDBCheckpointService, MongoDBService
+from app.services.pinecone_service import PineconeService
 
 
 @dataclass
 class ServiceContainer:
     """Holds the single shared instance of every infrastructure service."""
+
     mongodb: MongoDBService
     mongodb_checkpoint: MongoDBCheckpointService
     pinecone: PineconeService
@@ -39,5 +40,6 @@ async def create_service_container() -> AsyncIterator[ServiceContainer]:
         yield container
     finally:
         container.mongodb.close()
-        container.pinecone.index.close()
+        if container.pinecone.index is not None:
+            container.pinecone.index.close()
         container.mongodb_checkpoint.close()

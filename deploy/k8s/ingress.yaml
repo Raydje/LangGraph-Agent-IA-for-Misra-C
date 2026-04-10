@@ -1,0 +1,64 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ingress.yaml
+#
+# Exposes the MISRA C Agent API to external HTTP(S) traffic via an
+# nginx Ingress controller (cloud-agnostic; works on GKE, EKS, AKS, and
+# self-hosted clusters with ingress-nginx installed).
+#
+# Prerequisites:
+#   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/cloud/deploy.yaml
+#
+# TLS:
+#   The tls block references a Secret named misra-c-agent-tls.
+#   Use cert-manager to provision it automatically from Let's Encrypt:
+#     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.5/cert-manager.yaml
+#   Then annotate this Ingress with:
+#     cert-manager.io/cluster-issuer: letsencrypt-prod
+#
+# Apply: kubectl apply -f deploy/k8s/ingress.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: misra-c-agent-ingress
+  namespace: misra-c-agent
+  labels:
+    app.kubernetes.io/name: misra-c-agent
+    app.kubernetes.io/component: api
+  annotations:
+    # Route all traffic to this Ingress through the nginx controller.
+    kubernetes.io/ingress.class: nginx
+
+    # Redirect all plain HTTP requests to HTTPS at the Ingress layer.
+    # The application itself does not need to handle TLS termination.
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # Proxy timeout settings — LLM inference calls (Gemini) can take 30-60s.
+    # Default nginx timeout is 60s; raise to 120s to match the app's own
+    # configurable LLM timeout and avoid spurious 504 Gateway Timeout errors.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+
+    # Rate limiting at the Ingress layer (first line of defence before slowapi).
+    # 60 requests per minute per source IP — adjust to match app/rate_limit.py.
+    nginx.ingress.kubernetes.io/limit-rps: "1"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+spec:
+  tls:
+    - hosts:
+        - misra-agent.example.com   # Replace with your actual domain
+      # cert-manager (or a manually created Secret) will populate this Secret
+      # with the TLS certificate and private key.
+      secretName: misra-c-agent-tls
+
+  rules:
+    - host: misra-agent.example.com   # Replace with your actual domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: misra-c-agent-api   # Must match service.yaml metadata.name
+                port:
+                  name: http              # Must match service.yaml ports[].name

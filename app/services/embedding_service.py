@@ -1,8 +1,8 @@
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from app.config import get_settings
-from app.utils import logger
 from app.services.pinecone_service import PineconeService
+from app.utils import logger
 
 
 class EmbeddingService:
@@ -13,7 +13,7 @@ class EmbeddingService:
             google_api_key=settings.gemini_api_key,
             output_dimensionality=settings.embedding_dimensions,
         )
-        
+
     async def get_embedding(self, text: str) -> list[float]:
         return await self.embeddings.aembed_query(text)
 
@@ -22,15 +22,15 @@ class EmbeddingService:
             return 0
 
         logger.info("Generating embeddings for {len(rules)} rules...", number_of_rules=len(rules))
-        
+
         texts = [rule["full_text"] for rule in rules]
 
         all_embeddings = await self.embeddings.aembed_documents(texts)
 
         logger.info("Packaging vectors...")
-        
+
         vectors = []
-        for rule, embedding_vector in zip(rules, all_embeddings):
+        for rule, embedding_vector in zip(rules, all_embeddings, strict=True):
             rule_type = rule.get("rule_type", "Rule")
             vector_id = f"MISRA_{rule_type.upper()}_{rule['section']}.{rule['rule_number']}"
 
@@ -40,14 +40,10 @@ class EmbeddingService:
                 "section": rule["section"],
                 "rule_number": rule["rule_number"],
                 "category": rule["category"],
-                "text": rule["full_text"]
+                "text": rule["full_text"],
             }
-            
-            vectors.append({
-                "id": vector_id,
-                "values": embedding_vector,
-                "metadata": metadata
-            })
+
+            vectors.append({"id": vector_id, "values": embedding_vector, "metadata": metadata})
 
         logger.info("Delegating upload to pinecone_service...")
         upserted = await pinecone_service.upsert_vectors(vectors)

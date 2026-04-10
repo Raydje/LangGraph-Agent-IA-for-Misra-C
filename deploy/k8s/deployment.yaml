@@ -1,0 +1,174 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# deployment.yaml
+#
+# Runs 2 replicas of the MISRA C Agent API.
+# Scaling strategy: horizontal (replica count), not vertical (per-pod workers).
+#
+# Key senior design decisions documented inline:
+#  - Separate liveness and readiness probes (different failure semantics)
+#  - Resource requests != limits (requests for scheduling, limits for safety)
+#  - Non-root securityContext matching the Dockerfile appuser
+#  - RollingUpdate strategy with maxUnavailable=0 for zero-downtime deploys
+#  - envFrom for bulk injection of ConfigMap + Secret (clean, auditable)
+#
+# Apply: kubectl apply -f deploy/k8s/deployment.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: misra-c-agent-api
+  namespace: misra-c-agent
+  labels:
+    app.kubernetes.io/name: misra-c-agent
+    app.kubernetes.io/component: api
+spec:
+  # Two replicas: provides high availability across node failures.
+  # The MongoDBSaver checkpoint backend ensures state is shared across
+  # replicas without sticky sessions.
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: misra-c-agent
+      app.kubernetes.io/component: api
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # maxUnavailable: 0 — never take a pod down before the new one is ready.
+      # Guarantees zero-downtime deploys at the cost of briefly running 3 pods.
+      maxUnavailable: 0
+      # maxSurge: 1 — spin up one extra pod during the rollout, then drain old ones.
+      maxSurge: 1
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: misra-c-agent
+        app.kubernetes.io/component: api
+    spec:
+      # Anti-affinity ensures that the orchestrator attempts to schedule replicas on different nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: misra-c-agent
+                    app.kubernetes.io/component: api
+                topologyKey: kubernetes.io/hostname
+
+      # Ensure replicas are spread across different nodes for true HA.
+      # If only one node is available, the scheduler will still place both pods
+      # (whenUnsatisfiable: ScheduleAnyway), but prefers spreading them.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: misra-c-agent
+              app.kubernetes.io/component: api
+
+      # Do not mount the default service account token — this API does not
+      # call the Kubernetes API server, so granting the token is unnecessary
+      # attack surface.
+      automountServiceAccountToken: false
+
+      containers:
+        - name: api
+          # Image is set to the GHCR path. In CD, this is replaced with the
+          # exact SHA tag produced by the docker-push CI job:
+          #   kubectl set image deployment/misra-c-agent-api \
+          #     api=ghcr.io/<owner>/<repo>:<sha> -n misra-c-agent
+          image: ghcr.io/raydje/langgraph-agent-ia-for-misra-c:0.1.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          # Inject all non-sensitive config from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: misra-c-agent-config
+            # Inject all secrets — each key becomes an env var in the container
+            - secretRef:
+                name: misra-c-agent-secrets
+
+          # ── Probes ──────────────────────────────────────────────────────────
+          # Two probes with intentionally different semantics:
+          #
+          # startupProbe: gives the app up to 90s (30 * 3s) to initialize all
+          # external connections (MongoDB Atlas, Pinecone, Redis) before any
+          # other probe begins. Prevents liveness from killing a slow-starting pod.
+          startupProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 3
+
+          # readinessProbe: gates traffic. If the health endpoint fails (e.g.
+          # Pinecone or MongoDB is temporarily unreachable), the pod is removed
+          # from the Service endpoints — requests stop routing to it — without
+          # restarting it. The pod self-heals when dependencies recover.
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+
+          # livenessProbe: detects a hard deadlock or infinite loop. Only kills
+          # and restarts the container as a last resort. Uses a higher failure
+          # threshold to avoid restarting a pod that is merely slow under load.
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 5
+            successThreshold: 1
+
+          # ── Resources ───────────────────────────────────────────────────────
+          # requests: what the scheduler reserves on the node.
+          # limits: hard ceiling — container is OOM-killed if it exceeds memory.
+          #
+          # CPU limit is intentionally omitted: CPU throttling (not OOM kill)
+          # causes latency spikes in async Python. Let the container burst
+          # freely; the memory limit is the real safety guard.
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              # No CPU limit — see comment above
+
+          # ── Security Context ────────────────────────────────────────────────
+          # Mirrors the Dockerfile: run as the non-root appuser (UID 999).
+          # readOnlyRootFilesystem prevents any in-container write exploits.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          # Uvicorn writes .pyc / temp files to /tmp — mount an emptyDir
+          # so readOnlyRootFilesystem does not break it.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir: {}

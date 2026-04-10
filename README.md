@@ -625,7 +625,7 @@ This project prioritizes high-quality, reliable unit testing. We currently maint
 - **Unit Tests:** Located in `tests/unit/`. We use `pytest` with `pytest-asyncio` for asynchronous code.
 - **Mocking:** To ensure speed and isolation, we mock external services (Pinecone, MongoDB, Google Gemini) using `unittest.mock` (`AsyncMock`, `MagicMock`). We frequently use `object.__new__` to bypass `__init__` calls where SDK instantiation would otherwise be required.
 - **CI Requirements:**
-    - Linting: `ruff check . --select=E9,F63,F7,F82`
+    - Linting: `ruff check .` and `ruff format --check .`
     - Testing: `pytest tests/unit/ --cov=app`
 
 ### Running Tests

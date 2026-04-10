@@ -1,13 +1,16 @@
+import contextlib
 import re
+
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.errors import PyMongoError
+
 from app.config import get_settings
 from app.utils import logger
 
 _INDEX_FIELDS = [("rule_type", 1), ("section", 1), ("rule_number", 1)]
-_ID_RE = re.compile(r'^MISRA_(RULE|DIR)_(\d+)\.(\d+)$')
+_ID_RE = re.compile(r"^MISRA_(RULE|DIR)_(\d+)\.(\d+)$")
 
 
 # Sync pymongo client — MongoDBSaver (langgraph-checkpoint-mongodb) requires pymongo, not Motor.
@@ -105,8 +108,6 @@ class MongoDBService:
             await self.collection.insert_many(rules)
 
     async def create_indexes(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             await self.collection.drop_index("section_1_rule_number_1")
-        except Exception:
-            pass  # Index doesn't exist — that's fine
         await self.collection.create_index(_INDEX_FIELDS, unique=True)

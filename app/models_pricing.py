@@ -33,5 +33,5 @@ models_pricing = {
     "lyria-3-pro-preview": [1.50, 8.00],
     "gemini-robotics-er-1.5-preview": [0.50, 2.00],
     "gemini-2.5-computer-use-preview-10-2025": [0.40, 3.00],
-    "deep-research-pro-preview-12-2025": [5.00, 20.00]
+    "deep-research-pro-preview-12-2025": [5.00, 20.00],
 }

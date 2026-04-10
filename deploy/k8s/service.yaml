@@ -1,0 +1,33 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# service.yaml
+#
+# ClusterIP Service — exposes the API pods on a stable internal DNS name
+# within the cluster. External traffic enters via the Ingress (ingress.yaml),
+# not directly through this Service.
+#
+# ClusterIP is the correct type here because:
+#  - The Ingress controller is the single external entry point.
+#  - LoadBalancer type would provision a cloud load balancer per-service
+#    (expensive and unnecessary when Ingress already handles routing).
+#
+# Apply: kubectl apply -f deploy/k8s/service.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: misra-c-agent-api
+  namespace: misra-c-agent
+  labels:
+    app.kubernetes.io/name: misra-c-agent
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  selector:
+    # Must match the pod labels in deployment.yaml spec.template.metadata.labels
+    app.kubernetes.io/name: misra-c-agent
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http   # Named port reference from deployment.yaml containerPort
+      protocol: TCP

@@ -7,14 +7,14 @@ app.state.mongodb.db is a MagicMock with AsyncMock DB methods.
 get_current_principal is patched to return a pre-built Principal so the
 auth dependency chain is not exercised here (tested separately).
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
-from fastapi.security import SecurityScopes
 
 from app.auth.models import APIKeyCreate, Principal, RefreshRequest, UserCreate
 from app.auth.router import (
@@ -27,10 +27,10 @@ from app.auth.router import (
 )
 from app.auth.service import create_refresh_token, hash_password
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_db(
     *,
@@ -47,10 +47,12 @@ def _make_db(
     users.find_one = AsyncMock(return_value=existing_user or login_user or refresh_user)
     users.insert_one = AsyncMock(return_value=MagicMock(inserted_id="fake-id"))
     users.update_one = AsyncMock(return_value=None)
-    db.__getitem__ = MagicMock(side_effect=lambda name: {
-        "users": users,
-        "api_keys": _make_api_keys_coll(api_keys, update_result_matched),
-    }[name])
+    db.__getitem__ = MagicMock(
+        side_effect=lambda name: {
+            "users": users,
+            "api_keys": _make_api_keys_coll(api_keys, update_result_matched),
+        }[name]
+    )
     return db
 
 
@@ -60,7 +62,7 @@ def _make_api_keys_coll(api_keys: list[dict] | None, matched: int) -> MagicMock:
 
     # list_api_keys uses async for — need an async iterator
     async def _async_iter(*args, **kwargs):
-        for doc in (api_keys or []):
+        for doc in api_keys or []:
             yield doc
 
     coll.find = MagicMock(return_value=_async_iter())
@@ -96,6 +98,7 @@ def _make_form(username: str = "user@test.com", password: str = "password123") -
 # ---------------------------------------------------------------------------
 # POST /auth/register
 # ---------------------------------------------------------------------------
+
 
 async def test_register_success_returns_user_info():
     db = _make_db(existing_user=None)
@@ -168,6 +171,7 @@ async def test_register_admin_token_when_feature_disabled_raises_403():
 # POST /auth/token
 # ---------------------------------------------------------------------------
 
+
 async def test_login_success_returns_token_response():
     user = {
         "_id": "user-1",
@@ -236,6 +240,7 @@ async def test_login_inactive_account_raises_403():
 # POST /auth/refresh
 # ---------------------------------------------------------------------------
 
+
 async def test_refresh_success_rotates_tokens():
     user_id = "user-refresh"
     old_refresh = create_refresh_token(user_id)
@@ -280,6 +285,7 @@ async def test_refresh_token_not_in_db_raises_401():
 # ---------------------------------------------------------------------------
 # POST /auth/api-keys
 # ---------------------------------------------------------------------------
+
 
 async def test_create_api_key_returns_full_key_once():
     db = _make_db()
@@ -332,6 +338,7 @@ async def test_create_api_key_no_valid_scopes_raises_400():
 # GET /auth/api-keys
 # ---------------------------------------------------------------------------
 
+
 async def test_list_api_keys_returns_active_keys():
     keys = [
         {
@@ -341,7 +348,7 @@ async def test_list_api_keys_returns_active_keys():
             "expires_at": None,
             "last_used_at": None,
             "is_active": True,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
         }
     ]
     db = MagicMock()
@@ -366,6 +373,7 @@ async def test_list_api_keys_returns_active_keys():
 # ---------------------------------------------------------------------------
 # DELETE /auth/api-keys/{key_id}
 # ---------------------------------------------------------------------------
+
 
 async def test_revoke_api_key_success_returns_none():
     db = _make_db(update_result_matched=1)

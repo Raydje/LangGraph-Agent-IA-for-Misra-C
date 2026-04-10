@@ -1,0 +1,33 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# configmap.yaml
+#
+# Non-sensitive environment variables for the MISRA C Agent API.
+# Sensitive values (API keys, DB URIs, JWT secret) live in secret.yaml.
+#
+# Apply: kubectl apply -f deploy/k8s/configmap.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: misra-c-agent-config
+  namespace: misra-c-agent
+  labels:
+    app.kubernetes.io/name: misra-c-agent
+    app.kubernetes.io/component: api
+data:
+  # Redis is co-located in the same cluster; address by K8s service name.
+  # Override the default "localhost" value from .env.
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+
+  # Python runtime — match Dockerfile settings
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+  # Log level for structlog
+  LOG_LEVEL: "INFO"
+
+  # Uvicorn workers — keep at 1 inside K8s; scale via replica count instead.
+  # Multiple workers per pod would compete for the same port and complicate
+  # LangGraph's in-process state. Horizontal scaling is handled by the Deployment.
+  UVICORN_WORKERS: "1"

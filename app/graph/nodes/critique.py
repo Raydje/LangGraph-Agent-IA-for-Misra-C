@@ -1,18 +1,18 @@
 import asyncio
 from typing import Any
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
-from langchain_core.messages import SystemMessage, HumanMessage
+
+from app.config import get_settings
 from app.models.state import ComplianceState, CritiqueEntry
 from app.services.llm_service import get_structured_llm
-from app.config import get_settings
 from app.utils import extracting_tokens_metadata, logger
 
 
 # Structured output schema — guarantees valid typed output from the LLM
 class CritiqueOutput(BaseModel):
-    approved: bool = Field(
-        description="True only if the validation passes ALL 5 criteria."
-    )
+    approved: bool = Field(description="True only if the validation passes ALL 5 criteria.")
     feedback: str = Field(
         description=(
             "'Pass' if approved. If rejected, a specific explanation of which "
@@ -38,7 +38,9 @@ async def critique_node(state: ComplianceState) -> dict[str, Any]:
     is_compliant = state.get("is_compliant", False)
 
     actual_retrieved_rule_ids = [r["rule_id"] for r in rules]
-    logger.info("Critique_node", validation_result=validation_result, cited_rules=cited_rules, is_compliant=is_compliant)
+    logger.info(
+        "Critique_node", validation_result=validation_result, cited_rules=cited_rules, is_compliant=is_compliant
+    )
 
     system_prompt = """You are a Senior Quality Assurance Reviewer for MISRA C:2023 compliance.
 Your job is to review the validation report produced by a junior AI agent and determine if it is accurate, logical, and free of hallucinations.
@@ -75,11 +77,8 @@ Based on the 5 criteria, generate your structured verdict."""
 
     # Use with_structured_output for guaranteed Pydantic-validated output
     try:
-        raw_result = await asyncio.wait_for(
-            structured_llm.ainvoke(messages),
-            timeout=settings.llm_timeout
-        )
-    except asyncio.TimeoutError:
+        raw_result = await asyncio.wait_for(structured_llm.ainvoke(messages), timeout=settings.llm_timeout)
+    except TimeoutError:
         logger.error("Critique LLM call timed out after seconds.", timeout=settings.llm_timeout)
         return {
             "critique_approved": False,

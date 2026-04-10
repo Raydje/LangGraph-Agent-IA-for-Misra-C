@@ -70,7 +70,7 @@ EXPOSE 8000
 # Docker engine and orchestrators (ECS, K8s liveness probes) use this to
 # determine container health. start-period gives uvicorn time to initialise
 # all services (MongoDB, Pinecone, Redis) before checks begin.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=5s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

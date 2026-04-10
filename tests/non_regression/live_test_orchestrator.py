@@ -1,5 +1,6 @@
 import asyncio
 import os
+
 from dotenv import load_dotenv
 
 # Ensure environment variables are loaded before importing app modules
@@ -8,7 +9,10 @@ load_dotenv()
 
 # Adjust the imports based on your actual State implementation
 from app.graph.nodes.orchestrator import orchestrate
-from app.models.state import ComplianceState  # noqa: F401 — used for state type hints below
+from app.models.state import (
+    ComplianceState,  # noqa: F401 — used for state type hints below
+)
+
 
 async def run_live_tests():
     print("==================================================")
@@ -22,11 +26,11 @@ async def run_live_tests():
     state_search: ComplianceState = {
         "query": "What does MISRA C:2023 say about pointer arithmetic?",
         "code_snippet": "",
-        "standard": "MISRA C:2023"
+        "standard": "MISRA C:2023",
     }
-    
+
     result_search = await orchestrate(state_search)
-    print(f"Expected : search")
+    print("Expected : search")
     print(f"Got      : {result_search.get('intent')}")
     print(f"Reasoning: {result_search.get('orchestrator_reasoning')}")
     print(f"Tokens   : {result_search.get('total_tokens')} (Cost: ${result_search.get('estimated_cost', 0):.6f})\n")
@@ -43,11 +47,11 @@ async def run_live_tests():
             return a / b;
         }
         """,
-        "standard": "MISRA C:2023"
+        "standard": "MISRA C:2023",
     }
-    
+
     result_validate = await orchestrate(state_validate)
-    print(f"Expected : validate")
+    print("Expected : validate")
     print(f"Got      : {result_validate.get('intent')}")
     print(f"Reasoning: {result_validate.get('orchestrator_reasoning')}")
     print(f"Tokens   : {result_validate.get('total_tokens')} (Cost: ${result_validate.get('estimated_cost', 0):.6f})\n")
@@ -59,11 +63,11 @@ async def run_live_tests():
     state_explain: ComplianceState = {
         "query": "Explain why recursion is banned in MISRA.",
         "code_snippet": "",
-        "standard": "MISRA C:2023"
+        "standard": "MISRA C:2023",
     }
-    
+
     result_explain = await orchestrate(state_explain)
-    print(f"Expected : explain")
+    print("Expected : explain")
     print(f"Got      : {result_explain.get('intent')}")
     print(f"Reasoning: {result_explain.get('orchestrator_reasoning')}")
     print(f"Tokens   : {result_explain.get('total_tokens')} (Cost: ${result_explain.get('estimated_cost', 0):.6f})\n")
@@ -72,9 +76,10 @@ async def run_live_tests():
     print("✅ Live Test Complete")
     print("==================================================")
 
+
 if __name__ == "__main__":
     # Ensure asyncio uses the correct event loop policy depending on the OS
-    if os.name == 'nt':
+    if os.name == "nt":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        
+
     asyncio.run(run_live_tests())

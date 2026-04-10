@@ -6,6 +6,7 @@ The model_validator calls get_settings() to read max_input_length.
 The session-scoped override_settings fixture (conftest.py) already patches
 this to a Settings with max_input_length=3000, so no extra patching needed.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -13,10 +14,10 @@ from pydantic import ValidationError
 
 from app.api.v1.requests import ComplianceQueryRequest
 
-
 # ---------------------------------------------------------------------------
 # Happy paths
 # ---------------------------------------------------------------------------
+
 
 def test_valid_minimal_request():
     req = ComplianceQueryRequest(query="Is this compliant?")
@@ -40,6 +41,7 @@ def test_valid_full_request():
 # ---------------------------------------------------------------------------
 # Validation failures
 # ---------------------------------------------------------------------------
+
 
 def test_empty_query_raises_validation_error():
     with pytest.raises(ValidationError):

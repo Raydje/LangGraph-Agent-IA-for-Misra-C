@@ -4,17 +4,19 @@ Unit tests for app/services/llm_service.py.
 
 Patches ChatGoogleGenerativeAI so no real API calls are made.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
+
 from pydantic import BaseModel
 
 from app.services.llm_service import get_llm, get_structured_llm
 
-
 # ---------------------------------------------------------------------------
 # get_llm
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.llm_service.get_settings")
 @patch("app.services.llm_service.ChatGoogleGenerativeAI")
@@ -23,7 +25,7 @@ def test_get_llm_instantiates_with_settings_values(mock_llm_cls, mock_get_settin
     mock_get_settings.return_value.gemini_api_key = "test-fake-gemini-key"
     mock_get_settings.return_value.gemini_model = "gemini-2.5-flash"
 
-    llm = get_llm(temperature=0.5, timeout=30)
+    get_llm(temperature=0.5, timeout=30)
 
     mock_llm_cls.assert_called_once()
     call_kwargs = mock_llm_cls.call_args[1]
@@ -48,6 +50,7 @@ def test_get_llm_returns_llm_instance(mock_llm_cls):
 # get_structured_llm
 # ---------------------------------------------------------------------------
 
+
 class _DummySchema(BaseModel):
     value: str
 
@@ -61,9 +64,7 @@ def test_get_structured_llm_calls_with_structured_output(mock_llm_cls):
 
     result = get_structured_llm(_DummySchema)
 
-    fake_llm.with_structured_output.assert_called_once_with(
-        _DummySchema, include_raw=True
-    )
+    fake_llm.with_structured_output.assert_called_once_with(_DummySchema, include_raw=True)
     assert result is fake_chain
 
 

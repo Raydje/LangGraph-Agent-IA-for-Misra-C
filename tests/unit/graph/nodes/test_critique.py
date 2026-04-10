@@ -1,11 +1,12 @@
-from unittest.mock import MagicMock, AsyncMock, patch
 import asyncio
-from app.graph.nodes.critique import critique_node, CritiqueOutput
+from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.graph.nodes.critique import CritiqueOutput, critique_node
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _mock_structured_llm(
     parsed: CritiqueOutput | None,
@@ -17,11 +18,13 @@ def _mock_structured_llm(
     raw.usage_metadata = {"input_tokens": input_tokens, "output_tokens": output_tokens}
 
     structured_chain = MagicMock()
-    structured_chain.ainvoke = AsyncMock(return_value={
-        "raw": raw,
-        "parsed": parsed,
-        "parsing_error": None if parsed else ValueError("parse failed"),
-    })
+    structured_chain.ainvoke = AsyncMock(
+        return_value={
+            "raw": raw,
+            "parsed": parsed,
+            "parsing_error": None if parsed else ValueError("parse failed"),
+        }
+    )
     return structured_chain
 
 
@@ -40,6 +43,7 @@ def _base_state(**overrides) -> dict:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 async def test_approved_sets_critique_approved_true():
     parsed = CritiqueOutput(approved=True, feedback="Pass")
@@ -87,9 +91,7 @@ async def test_empty_retrieved_rules_no_crash():
 async def test_non_compliant_state_no_crash():
     parsed = CritiqueOutput(approved=False, feedback="Logical inconsistency.")
     with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(parsed)):
-        result = await critique_node(
-            _base_state(is_compliant=False, validation_result="Recursion found.")
-        )
+        result = await critique_node(_base_state(is_compliant=False, validation_result="Recursion found."))
 
     assert result["critique_approved"] is False
 
@@ -128,8 +130,10 @@ async def test_critique_history_populated_on_rejection():
 
 async def test_timeout_sets_critique_approved_false():
     """asyncio.TimeoutError during structured LLM call → critique_approved False, zero tokens."""
-    with patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(None)), \
-         patch("app.graph.nodes.critique.asyncio.wait_for", side_effect=asyncio.TimeoutError):
+    with (
+        patch("app.graph.nodes.critique.get_structured_llm", return_value=_mock_structured_llm(None)),
+        patch("app.graph.nodes.critique.asyncio.wait_for", side_effect=asyncio.TimeoutError),
+    ):
         result = await critique_node(_base_state())
 
     assert result["critique_approved"] is False

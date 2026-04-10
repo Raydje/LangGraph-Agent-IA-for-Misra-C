@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, model_validator
-from typing import Optional
+
 from app.config import get_settings
+
 
 class ComplianceQueryRequest(BaseModel):
     query: str = Field(
@@ -8,7 +9,7 @@ class ComplianceQueryRequest(BaseModel):
         min_length=1,
         description="Natural language compliance question",
     )
-    code_snippet: Optional[str] = Field(
+    code_snippet: str | None = Field(
         None,
         description="Code or requirement text to validate",
     )
@@ -17,7 +18,7 @@ class ComplianceQueryRequest(BaseModel):
         min_length=1,
         description="Technical standard to query against",
     )
-    thread_id: Optional[str] = Field(
+    thread_id: str | None = Field(
         None,
         max_length=100,
         description="Optional thread ID to continue an existing conversation; a new UUID is generated if omitted",

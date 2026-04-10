@@ -1,11 +1,12 @@
-from unittest.mock import MagicMock, AsyncMock, patch
 import asyncio
-from app.graph.nodes.orchestrator import orchestrate, OrchestratorOutput
+from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.graph.nodes.orchestrator import OrchestratorOutput, orchestrate
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_raw_result(intent: str, reasoning: str) -> dict:
     """Build the dict that chain.ainvoke() returns when include_raw=True."""
@@ -42,9 +43,12 @@ def _setup_mocks(mock_get_structured_llm, mock_template, intent: str, reasoning:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 async def test_returns_intent_and_reasoning_from_llm():
-    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
-         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template:
+    with (
+        patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm,
+        patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template,
+    ):
         _setup_mocks(mock_get_structured_llm, mock_template, "search", "User is asking about rules.")
 
         result = await orchestrate({"query": "What are pointer rules?", "code_snippet": ""})
@@ -54,8 +58,10 @@ async def test_returns_intent_and_reasoning_from_llm():
 
 
 async def test_standard_is_always_hardcoded_to_misra():
-    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
-         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template:
+    with (
+        patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm,
+        patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template,
+    ):
         _setup_mocks(mock_get_structured_llm, mock_template, "validate", "Code snippet present.")
 
         result = await orchestrate({"query": "Check this code", "code_snippet": "int x = 0;"})
@@ -64,8 +70,10 @@ async def test_standard_is_always_hardcoded_to_misra():
 
 
 async def test_explain_intent_propagated():
-    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
-         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template:
+    with (
+        patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm,
+        patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template,
+    ):
         _setup_mocks(mock_get_structured_llm, mock_template, "explain", "User wants an explanation.")
 
         result = await orchestrate({"query": "Explain rule 15.5", "code_snippet": ""})
@@ -75,8 +83,10 @@ async def test_explain_intent_propagated():
 
 async def test_returns_exactly_three_state_keys():
     """Verify that at minimum the three LangGraph-relevant state keys are present."""
-    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
-         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template:
+    with (
+        patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm,
+        patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template,
+    ):
         _setup_mocks(mock_get_structured_llm, mock_template, "search", "reason")
 
         result = await orchestrate({"query": "Find rules", "code_snippet": ""})
@@ -85,8 +95,10 @@ async def test_returns_exactly_three_state_keys():
 
 
 async def test_chain_invoked_with_query_and_code():
-    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
-         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template:
+    with (
+        patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm,
+        patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template,
+    ):
         chain = _setup_mocks(mock_get_structured_llm, mock_template, "validate", "Code provided.")
 
         await orchestrate({"query": "Validate code", "code_snippet": "void foo() {}"})
@@ -98,8 +110,10 @@ async def test_chain_invoked_with_query_and_code():
 
 
 async def test_no_code_snippet_passes_none_provided_string():
-    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
-         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template:
+    with (
+        patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm,
+        patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template,
+    ):
         chain = _setup_mocks(mock_get_structured_llm, mock_template, "search", "No code.")
 
         await orchestrate({"query": "Find memory rules", "code_snippet": ""})
@@ -109,8 +123,10 @@ async def test_no_code_snippet_passes_none_provided_string():
 
 
 async def test_get_structured_llm_called_with_orchestrator_output_schema():
-    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
-         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template:
+    with (
+        patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm,
+        patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template,
+    ):
         _setup_mocks(mock_get_structured_llm, mock_template, "search", "r")
 
         await orchestrate({"query": "q", "code_snippet": ""})
@@ -121,9 +137,11 @@ async def test_get_structured_llm_called_with_orchestrator_output_schema():
 
 async def test_timeout_returns_default_search_intent():
     """asyncio.TimeoutError during chain.ainvoke → default 'search' response with zeros."""
-    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
-         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template, \
-         patch("app.graph.nodes.orchestrator.asyncio.wait_for", side_effect=asyncio.TimeoutError):
+    with (
+        patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm,
+        patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template,
+        patch("app.graph.nodes.orchestrator.asyncio.wait_for", side_effect=asyncio.TimeoutError),
+    ):
         _setup_mocks(mock_get_structured_llm, mock_template, "search", "r")
         result = await orchestrate({"query": "q", "code_snippet": ""})
 
@@ -136,8 +154,10 @@ async def test_timeout_returns_default_search_intent():
 
 async def test_parse_failure_returns_default_search_intent():
     """When chain returns {'parsed': None}, the ValueError path returns search defaults."""
-    with patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm, \
-         patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template:
+    with (
+        patch("app.graph.nodes.orchestrator.get_structured_llm") as mock_get_structured_llm,
+        patch("app.graph.nodes.orchestrator.ChatPromptTemplate") as mock_template,
+    ):
         chain = _setup_mocks(mock_get_structured_llm, mock_template, "search", "r")
         # Override ainvoke to return a result with parsed=None
         chain.ainvoke = AsyncMock(return_value={"parsed": None, "raw": MagicMock()})

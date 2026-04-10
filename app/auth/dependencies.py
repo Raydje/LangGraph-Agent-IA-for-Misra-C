@@ -16,9 +16,10 @@ Scope catalogue:
     admin:replay  — invoke /replay
     admin:all     — unrestricted (satisfies any scope check)
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
@@ -70,15 +71,16 @@ async def get_current_principal(
 # Internal resolvers
 # ---------------------------------------------------------------------------
 
+
 def _resolve_jwt(token: str) -> Principal:
     try:
         payload = decode_token(token)
-    except JWTError:
+    except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     if payload.get("type") != "access":
         raise HTTPException(
@@ -98,12 +100,12 @@ def _resolve_jwt(token: str) -> Principal:
 async def _resolve_api_key(request: Request, full_key: str) -> Principal:
     try:
         key_id, secret = parse_api_key(full_key)
-    except ValueError:
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Malformed API key",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     db = request.app.state.mongodb.db
     key_doc = await db["api_keys"].find_one({"key_id": key_id, "is_active": True})
@@ -117,7 +119,7 @@ async def _resolve_api_key(request: Request, full_key: str) -> Principal:
 
     # Expiry check
     expires_at = key_doc.get("expires_at")
-    if expires_at and expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+    if expires_at and expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="API key expired",
@@ -135,7 +137,7 @@ async def _resolve_api_key(request: Request, full_key: str) -> Principal:
     # Fire-and-forget last_used_at update (non-blocking)
     await db["api_keys"].update_one(
         {"key_id": key_id},
-        {"$set": {"last_used_at": datetime.now(timezone.utc)}},
+        {"$set": {"last_used_at": datetime.now(UTC)}},
     )
 
     user_doc = await db["users"].find_one({"_id": key_doc["user_id"]})
@@ -150,11 +152,7 @@ async def _resolve_api_key(request: Request, full_key: str) -> Principal:
 
 
 def _build_401(security_scopes: SecurityScopes, detail: str) -> HTTPException:
-    www_auth = (
-        f'Bearer scope="{security_scopes.scope_str}"'
-        if security_scopes.scopes
-        else "Bearer"
-    )
+    www_auth = f'Bearer scope="{security_scopes.scope_str}"' if security_scopes.scopes else "Bearer"
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail=detail,

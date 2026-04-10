@@ -79,8 +79,10 @@ def pytest_collection_modifyitems(items: list, config: object) -> None:  # noqa:
 # Import after the guard so that Settings() is never constructed with dummies
 # on a cache miss if the cache was already primed by the unit conftest.
 from app.config import get_settings  # noqa: E402
-from app.services.service_container import ServiceContainer, create_service_container  # noqa: E402
-
+from app.services.service_container import (  # noqa: E402
+    ServiceContainer,
+    create_service_container,
+)
 
 # ---------------------------------------------------------------------------
 # Session-scoped service fixtures

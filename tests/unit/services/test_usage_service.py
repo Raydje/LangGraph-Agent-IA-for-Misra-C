@@ -4,18 +4,17 @@ Unit tests for app/services/usage_service.py.
 
 All MongoDB interactions are mocked via AsyncMock — no real DB connection required.
 """
+
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, call
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 from app.services.usage_service import UsageService
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_db(
     user_doc: dict | None = None,
@@ -63,24 +62,25 @@ def _make_service(db: MagicMock) -> UsageService:
     return UsageService(db=db)
 
 
-_RECORD_KWARGS = dict(
-    user_id="user-123",
-    endpoint="/api/v1/query",
-    method="POST",
-    thread_id="thread-abc",
-    prompt_tokens=100,
-    completion_tokens=50,
-    total_tokens=150,
-    estimated_cost=0.003,
-    critique_iterations=0,
-    nodes_visited=None,
-    status_code=200,
-)
+_RECORD_KWARGS = {
+    "user_id": "user-123",
+    "endpoint": "/api/v1/query",
+    "method": "POST",
+    "thread_id": "thread-abc",
+    "prompt_tokens": 100,
+    "completion_tokens": 50,
+    "total_tokens": 150,
+    "estimated_cost": 0.003,
+    "critique_iterations": 0,
+    "nodes_visited": None,
+    "status_code": 200,
+}
 
 
 # ---------------------------------------------------------------------------
 # check_budget
 # ---------------------------------------------------------------------------
+
 
 async def test_check_budget_within_limit_returns_true():
     db = _make_db(user_doc={"_id": "user-123", "total_cost": 1.5})
@@ -128,14 +128,13 @@ async def test_check_budget_queries_correct_user():
     db = _make_db(user_doc={"_id": "user-123", "total_cost": 0.0})
     svc = _make_service(db)
     await svc.check_budget("user-123", max_budget=5.0)
-    db["users"].find_one.assert_called_once_with(
-        {"_id": "user-123"}, {"total_cost": 1}
-    )
+    db["users"].find_one.assert_called_once_with({"_id": "user-123"}, {"total_cost": 1})
 
 
 # ---------------------------------------------------------------------------
 # record_usage
 # ---------------------------------------------------------------------------
+
 
 async def test_record_usage_inserts_log_and_increments_user():
     db = _make_db()
@@ -190,10 +189,18 @@ async def test_record_usage_log_contains_all_required_fields():
     await svc.record_usage(**_RECORD_KWARGS)
     inserted = db["usage_logs"].insert_one.call_args[0][0]
     required_fields = {
-        "user_id", "endpoint", "method", "timestamp",
-        "thread_id", "prompt_tokens", "completion_tokens",
-        "total_tokens", "estimated_cost", "critique_iterations",
-        "nodes_visited", "status_code",
+        "user_id",
+        "endpoint",
+        "method",
+        "timestamp",
+        "thread_id",
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+        "estimated_cost",
+        "critique_iterations",
+        "nodes_visited",
+        "status_code",
     }
     assert required_fields.issubset(inserted.keys())
 
@@ -201,6 +208,7 @@ async def test_record_usage_log_contains_all_required_fields():
 # ---------------------------------------------------------------------------
 # get_user_usage
 # ---------------------------------------------------------------------------
+
 
 async def test_get_user_usage_returns_combined_summary():
     log_entry = {"user_id": "user-123", "estimated_cost": 0.003, "critique_iterations": 0, "nodes_visited": None}
@@ -228,6 +236,7 @@ async def test_get_user_usage_unknown_user_returns_empty():
 # ---------------------------------------------------------------------------
 # create_indexes
 # ---------------------------------------------------------------------------
+
 
 async def test_create_indexes_creates_all_three_indexes():
     db = _make_db()

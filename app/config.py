@@ -1,6 +1,8 @@
+from functools import lru_cache
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
-from functools import lru_cache
+
 from app.models_pricing import models_pricing
 
 
@@ -23,7 +25,7 @@ class Settings(BaseSettings):
         self.gemini_2_5_flash_input_cost_per_1m = pricing[0]
         self.gemini_2_5_flash_output_cost_per_1m = pricing[1]
         return self
-    
+
     # Pinecone
     pinecone_api_key: str
     pinecone_index_name: str = "compliance-rules"
@@ -45,7 +47,7 @@ class Settings(BaseSettings):
     max_input_length: int = 3000
 
     # Graph control
-    max_critique_iterations: int = 4
+    max_critique_iterations: int = 3
 
     # Node temperatures
     orchestrator_temperature: float = 0.0
@@ -72,8 +74,8 @@ class Settings(BaseSettings):
 
     # Per-user rate limiting & budget enforcement
     # Applies to all non-admin users (admin:all scope bypasses both checks)
-    user_rate_limit_per_minute: int = 20   # Max API requests per user per minute
-    user_max_budget: float = 5.0           # Lifetime cost cap per user in USD
+    user_rate_limit_per_minute: int = 20  # Max API requests per user per minute
+    user_max_budget: float = 5.0  # Lifetime cost cap per user in USD
 
     @property
     def redis_uri(self) -> str:
@@ -84,6 +86,6 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]

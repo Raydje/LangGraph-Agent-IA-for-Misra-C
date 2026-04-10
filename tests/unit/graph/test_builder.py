@@ -2,11 +2,13 @@
 Unit tests for assemble_node (defined inline in graph/builder.py).
 No LLM calls — purely a state formatting function.
 """
-from unittest.mock import MagicMock, patch, AsyncMock, call
+
+from unittest.mock import MagicMock, patch
+
 from app.graph.builder import assemble_node
 
-
 # --- Helpers ---
+
 
 def _validate_state(compliant, confidence, cited, details, standard="MISRA C:2023", error=None):
     return {
@@ -21,6 +23,7 @@ def _validate_state(compliant, confidence, cited, details, standard="MISRA C:202
 
 
 # --- validate intent ---
+
 
 async def test_assemble_compliant_verdict_contains_key_fields():
     state = _validate_state(True, 0.95, ["Rule 1.1", "Rule 2.3"], "All rules satisfied.")
@@ -53,6 +56,7 @@ async def test_assemble_validate_standard_name_in_output():
 
 # --- search intent ---
 
+
 async def test_assemble_search_with_rules_lists_them():
     state = {
         "intent": "search",
@@ -77,6 +81,7 @@ async def test_assemble_search_no_rules_returns_not_found_message():
 
 # --- explain intent ---
 
+
 async def test_assemble_explain_with_rules():
     state = {
         "intent": "explain",
@@ -97,6 +102,7 @@ async def test_assemble_explain_no_rules_returns_not_found_message():
 
 # --- error state ---
 
+
 async def test_assemble_error_overrides_normal_logic():
     state = {"error": "Upstream service failed", "intent": "search"}
     text = (await assemble_node(state))["final_response"]
@@ -113,6 +119,7 @@ async def test_assemble_returns_final_response_key():
 # build_graph — wiring tests (no LLM, no real MongoDB)
 # ---------------------------------------------------------------------------
 
+
 async def test_build_graph_returns_compiled_graph():
     """build_graph() must return the object produced by workflow.compile()."""
     mock_checkpointer = MagicMock()
@@ -122,6 +129,7 @@ async def test_build_graph_returns_compiled_graph():
 
     with patch("app.graph.builder.StateGraph", return_value=mock_workflow):
         from app.graph.builder import build_graph
+
         result = await build_graph(mock_checkpointer)
 
     assert result is mock_compiled
@@ -134,6 +142,7 @@ async def test_build_graph_registers_all_six_nodes():
 
     with patch("app.graph.builder.StateGraph", return_value=mock_workflow):
         from app.graph.builder import build_graph
+
         await build_graph(mock_checkpointer)
 
     added_names = [c[0][0] for c in mock_workflow.add_node.call_args_list]
@@ -141,12 +150,14 @@ async def test_build_graph_registers_all_six_nodes():
 
 
 async def test_build_graph_adds_linear_edges():
-    from langgraph.graph import START, END
+    from langgraph.graph import END, START
+
     mock_checkpointer = MagicMock()
     mock_workflow = MagicMock()
 
     with patch("app.graph.builder.StateGraph", return_value=mock_workflow):
         from app.graph.builder import build_graph
+
         await build_graph(mock_checkpointer)
 
     edge_calls = [c[0] for c in mock_workflow.add_edge.call_args_list]
@@ -163,6 +174,7 @@ async def test_build_graph_adds_conditional_edges_after_rag_and_critique():
 
     with patch("app.graph.builder.StateGraph", return_value=mock_workflow):
         from app.graph.builder import build_graph
+
         await build_graph(mock_checkpointer)
 
     conditional_sources = [c[0][0] for c in mock_workflow.add_conditional_edges.call_args_list]
@@ -172,11 +184,13 @@ async def test_build_graph_adds_conditional_edges_after_rag_and_critique():
 
 async def test_build_graph_initialises_state_graph_with_compliance_state():
     from app.models.state import ComplianceState
+
     mock_checkpointer = MagicMock()
 
     with patch("app.graph.builder.StateGraph") as mock_sg_cls:
         mock_sg_cls.return_value = MagicMock()
         from app.graph.builder import build_graph
+
         await build_graph(mock_checkpointer)
 
     mock_sg_cls.assert_called_once_with(ComplianceState)
