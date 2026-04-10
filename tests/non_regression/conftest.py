@@ -26,6 +26,9 @@ import os
 
 import httpx
 import pytest
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Guard — skip the entire session if required env vars are absent.
