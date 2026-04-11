@@ -36,6 +36,7 @@ pip-delete-this-directory.txt
 .coverage
 coverage.xml
 htmlcov/
+reports/
 .tox/
 
 # Type checking

@@ -223,4 +223,8 @@ jobs:
           docker compose \
             -f docker-compose.yml \
             -f docker-compose.tnr.yml \
+<<<<<<< Adding_golden_data_set_plus_test_end_to_end
             down --volumes
+=======
+            down --volumes
+>>>>>>> main

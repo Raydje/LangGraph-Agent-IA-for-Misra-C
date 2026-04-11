@@ -1,0 +1,29 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# docker-compose.tnr.yml  —  Non-Regression override
+#
+# Usage (always composed on top of the base file):
+#   docker compose -f docker-compose.yml -f docker-compose.tnr.yml up -d
+#
+# What this override does:
+#   1. Removes the local mongodb dependency from `api` — the TNR suite points
+#      MONGODB_URI at the persistent Atlas instance (injected via CI secrets),
+#      so no local mongo container is needed or started.
+#   2. Clears the hot-reload volume mount — in CI we run the baked image as-is,
+#      not a source-mounted dev server.
+#   3. Switches the command to production mode (no --reload flag).
+#
+# Services NOT overridden (redis) are inherited unchanged from docker-compose.yml.
+# The mongodb service is defined in the base file but will not be started because
+# `api` no longer depends on it and it is not explicitly requested.
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  api:
+    # Only wait for redis — MongoDB is remote (Atlas).
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Drop the source-code volume mount; use the baked image unchanged.
+    volumes: []
+    # Production command — no --reload in CI.
+    command: uvicorn main:app --host 0.0.0.0 --port 8000

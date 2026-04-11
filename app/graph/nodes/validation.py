@@ -17,12 +17,14 @@ class ValidationOutput(BaseModel):
         description=(
             "Detailed explanation of each violation or confirmation of compliance. "
             "Reference specific lines when possible. Every rule mentioned MUST use "
-            "the format 'Rule ID (Category): ...' — e.g., 'Rule MISRA_15.5 (Required): ...'."
+            "the format 'Rule ID (Category): ...' — e.g., 'MISRA_RULE_17.4 (Required): ...'."
         )
     )
     confidence_score: float = Field(description="Float between 0.0 and 1.0 indicating confidence in the assessment.")
     cited_rules: list[str] = Field(
-        description=("List of MISRA C:2023 rule IDs used in the evaluation (e.g., ['Rule MISRA_15.5', 'Dir 4.1']).")
+        description=(
+            "List of MISRA C:2023 rule IDs used in the evaluation (e.g., ['MISRA_RULE_17.4', 'MISRA_DIR_4.7'])."
+        )
     )
 
 
@@ -43,7 +45,7 @@ async def validation_node(state: ComplianceState) -> dict[str, Any]:
     iteration = state.get("iteration_count", 0)
     logger.info("Validation_node", query=query, code_snippet=code, iteration=iteration)
 
-    # Format retrieved rules — MISRA C:2023 IDs are either "Dir X.Y" or "Rule MISRA_X.Y"
+    # Format retrieved rules — MISRA C:2023 IDs are either "MISRA_DIR_X.Y" or "MISRA_RULE_X.Y"
     rules_context = "\n\n".join(
         [
             f"Rule ID: {r['rule_id']}\nCategory: {r.get('category', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"
@@ -55,18 +57,18 @@ async def validation_node(state: ComplianceState) -> dict[str, Any]:
 Your task is to validate the provided C/C++ code against the provided MISRA C:2023 rules.
 
 MISRA C:2023 rule IDs follow these formats:
-- Directives: "Dir X.Y" (e.g., "Dir 4.1")
-- Rules: "Rule MISRA_X.Y" (e.g., "Rule MISRA_15.5")
+- Directives: "MISRA_DIR_X.Y" (e.g., "MISRA_DIR_4.7 (Mandatory)")
+- Rules: "MISRA_RULE_X.Y" (e.g., "MISRA_RULE_17.4 (Required), "MISRA_RULE_1.2 (Advisory)")
 Categories are: Mandatory, Required, or Advisory.
 
 Field details:
 - "is_compliant": true only if the code fully satisfies all applicable retrieved rules.
 - "validation_result": detailed explanation of each violation or confirmation of compliance. Reference specific lines when possible.
   IMPORTANT: Every rule you mention in this field MUST be written as "Rule ID (Category)" — for example:
-  "Rule MISRA_15.5 (Required): ..." or "Dir 4.1 (Mandatory): ...".
+  "MISRA_RULE_17.4 (Required): ..." or "MISRA_DIR_4.7 (Mandatory): ...".
   The category (Mandatory, Required, or Advisory) is provided for each rule in the context. Never omit it.
 - "confidence_score": float between 0.0 and 1.0.
-- "cited_rules": list of MISRA C:2023 rule IDs used in the evaluation (e.g., ["Rule MISRA_15.5", "Dir 4.1"])."""
+- "cited_rules": list of MISRA C:2023 rule IDs used in the evaluation (e.g., ["MISRA_RULE_17.4", "MISRA_DIR_4.7"])."""
 
     critique_section = ""
     if iteration > 0 and critique_feedback:

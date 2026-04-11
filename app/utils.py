@@ -6,10 +6,10 @@ from app.config import get_settings
 
 
 def calculate_gemini_cost(prompt_tokens: int, completion_tokens: int) -> float:
-    """Calculates the estimated cost for Gemini 2.5 Flash usage."""
+    """Calculates the estimated cost for model usage."""
     settings = get_settings()
-    input_cost = (prompt_tokens / 1_000_000) * settings.gemini_2_5_flash_input_cost_per_1m
-    output_cost = (completion_tokens / 1_000_000) * settings.gemini_2_5_flash_output_cost_per_1m
+    input_cost = (prompt_tokens / 1_000_000) * settings.llm_input_cost_per_1m
+    output_cost = (completion_tokens / 1_000_000) * settings.llm_output_cost_per_1m
     return input_cost + output_cost
 
 

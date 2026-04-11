@@ -125,12 +125,12 @@ def test_redis_uri_with_password_includes_credentials():
 
 def test_known_model_populates_pricing():
     s = Settings(**_REQUIRED, gemini_model="gemini-2.5-flash")
-    assert s.gemini_2_5_flash_input_cost_per_1m == 0.30
-    assert s.gemini_2_5_flash_output_cost_per_1m == 2.50
+    assert s.llm_input_cost_per_1m == 0.30
+    assert s.llm_output_cost_per_1m == 2.50
 
 
 def test_unknown_model_falls_back_to_flash_pricing():
     s = Settings(**_REQUIRED, gemini_model="totally-unknown-model-xyz")
     # Falls back to gemini-2.5-flash pricing
-    assert s.gemini_2_5_flash_input_cost_per_1m == 0.30
-    assert s.gemini_2_5_flash_output_cost_per_1m == 2.50
+    assert s.llm_input_cost_per_1m == 0.30
+    assert s.llm_output_cost_per_1m == 2.50

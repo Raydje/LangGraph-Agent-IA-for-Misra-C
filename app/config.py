@@ -15,15 +15,15 @@ class Settings(BaseSettings):
 
     # Pricing dollar per 1M tokens (Standard Google AI Studio Pay-as-you-go)
     # Populated at runtime by set_model_pricing based on the active gemini_model
-    gemini_2_5_flash_input_cost_per_1m: float = 0.0
-    gemini_2_5_flash_output_cost_per_1m: float = 0.0
+    llm_input_cost_per_1m: float = 0.0
+    llm_output_cost_per_1m: float = 0.0
 
     @model_validator(mode="after")
     def set_model_pricing(self) -> "Settings":
         fallback = models_pricing.get("gemini-2.5-flash", [0.0, 0.0])
         pricing = models_pricing.get(self.gemini_model, fallback)
-        self.gemini_2_5_flash_input_cost_per_1m = pricing[0]
-        self.gemini_2_5_flash_output_cost_per_1m = pricing[1]
+        self.llm_input_cost_per_1m = pricing[0]
+        self.llm_output_cost_per_1m = pricing[1]
         return self
 
     # Pinecone
@@ -83,7 +83,7 @@ class Settings(BaseSettings):
             return f"redis://{self.redis_user}:{self.redis_password}@{self.redis_host}:{self.redis_port}"
         return f"redis://{self.redis_host}:{self.redis_port}"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 @lru_cache
