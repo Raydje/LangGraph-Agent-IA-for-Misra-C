@@ -149,75 +149,70 @@ The **`ComplianceState`** TypedDict threads data across all nodes. Token and cos
 ## Project Structure
 
 ```
-LangGragh-Agent-IA-for-Misra-C/
+LangGraph-Agent-IA-for-Misra-C/
 ├── main.py                              # FastAPI app factory + lifespan (MongoDB checkpoint)
 ├── requirements.txt
 ├── pytest.ini
+├── docker-compose.yml                   # Local stack (API, MongoDB, Redis)
+├── Dockerfile                           # Multi-stage production build
 │
 ├── app/
-│   ├── config.py                        # Pydantic Settings (lru_cache), CORS origins, timeout config
-│   ├── utils.py                         # calculate_gemini_cost(), structlog
+│   ├── config.py                        # Pydantic Settings (lru_cache), CORS, timeout config
+│   ├── utils.py                         # structlog initialization, helper functions
 │   ├── models_pricing.py                # Gemini model pricing table (30+ models)
 │   │
 │   ├── models/
-│   │   ├── state.py                     # ComplianceState TypedDict (with token tracking reducers)
-│   │   ├── requests.py                  # ComplianceQueryRequest (with thread_id), max_length validation
-│   │   └── responses.py                 # ComplianceQueryResponse, ThreadHistory*, MetadataUsage
+│   │   └── state.py                     # ComplianceState TypedDict (with token tracking reducers)
 │   │
 │   ├── graph/
 │   │   ├── builder.py                   # build_graph() with MongoDBSaver + inline assemble_node
 │   │   ├── edges.py                     # route_after_rag, should_loop_or_finish
 │   │   └── nodes/
 │   │       ├── orchestrator.py          # Intent classifier (async, structured output)
-│   │       ├── rag.py                   # Dense retrieval: Pinecone → MongoDB (async)
+│   │       ├── rag.py                   # Hybrid retrieval: Pinecone → MongoDB (async)
 │   │       ├── validation.py            # MISRA compliance checker (async, structured output)
-│   │       ├── critique.py              # 5-criteria hallucination reviewer (async, structured output)
+│   │       ├── critique.py              # 5-criteria hallucination reviewer (async)
 │   │       └── remedier.py              # Code remediation (async, structured output)
 │   │
 │   ├── services/
-│   │   ├── llm_service.py              # get_llm(), get_structured_llm() wrappers
+│   │   ├── llm_service.py               # get_llm(), get_structured_llm() wrappers
 │   │   ├── embedding_service.py         # Singleton, async embed + store
-│   │   ├── pinecone_service.py          # Auto-creates index, query/upsert via asyncio.to_thread
-│   │   └── mongodb_service.py           # Async Motor CRUD (rules) + sync pymongo (checkpoints)
+│   │   ├── pinecone_service.py          # Vector query/upsert via asyncio.to_thread
+│   │   ├── mongodb_service.py           # Async Motor CRUD (rules) + sync pymongo (checkpoints)
+│   │   ├── usage_service.py             # User-specific token and cost tracking
+│   │   └── service_container.py         # Singleton container for easy service access
 │   │
 │   ├── api/
-│   │   ├── routes.py                    # (legacy entry-point, delegates to v1)
-│   │   ├── dependencies.py             # get_compiled_graph (from app.state), DB deps, rate limiter
+│   │   ├── dependencies.py              # Graph + DB dependencies, rate limiter injection
+│   │   ├── rate_limit.py                # Redis-backed async rate limiter
 │   │   └── v1/
-│   │       ├── routes.py                # /health, /query, /seed, /replay, /history
-│   │       ├── requests.py              # ComplianceQueryRequest (v1 schema)
-│   │       └── responses.py             # ComplianceQueryResponse, HealthResponse, etc. (v1 schema)
+│   │       ├── routes.py                # /health, /query, /seed, /replay, /history, /usage
+│   │       ├── requests.py              # API Request schemas (Pydantic)
+│   │       └── responses.py             # API Response schemas (Pydantic)
 │   │
 │   ├── auth/
-│   │   ├── models.py                    # UserCreate, Principal, TokenResponse, APIKeyResponse, etc.
-│   │   ├── service.py                   # bcrypt, JWT (HS256), API key generation/verification
-│   │   ├── dependencies.py             # get_current_principal — dual JWT/API-key resolver
-│   │   └── router.py                    # /auth/register, /token, /refresh, /api-keys CRUD
+│   │   ├── models.py                    # User, Token, and API Key schemas
+│   │   ├── service.py                   # bcrypt, JWT, API key generation logic
+│   │   ├── dependencies.py              # get_current_principal (dual JWT/API-key resolver)
+│   │   └── router.py                    # /auth/register, /token, /refresh, /api-keys
 │   │
 │   └── data/
 │       └── ingest.py                    # MISRA parser → MongoDB + Pinecone ingestion
 │
 ├── data/
-│   └── misra_c_2023__headlines_for_cppcheck.txt   # ~250+ raw MISRA C:2023 rule definitions
+│   ├── misra_c_2023__headlines_for_cppcheck.txt   # ~250+ raw MISRA C:2023 rule definitions
+│   └── golden_dataset.json              # 10+ E2E test cases for non-regression suite
+│
+├── deploy/
+│   └── k8s/                             # Kubernetes manifests (Deployment, Ingress, etc.)
+│
+├── bruno_collection/                    # Bruno API client collection for local testing
 │
 └── tests/
     ├── conftest.py                      # Session-wide settings override with dummy keys
-    ├── misra_test_sample.c              # ADCS CubeSat controller with deliberate MISRA violations
-    ├── code_c_snippet_example.json      # 10 pre-built test payloads
-    └── unit/
-        ├── graph/
-        │   ├── test_builder.py
-        │   ├── test_edges.py
-        │   └── nodes/
-        │       ├── test_rag.py
-        │       ├── test_orchestrator.py
-        │       ├── test_validation.py
-        │       ├── test_critique.py
-        │       └── test_remedier.py
-        ├── services/
-        │   └── test_mongodb_service.py
-        └── utils/
-            └── test_utils.py
+    ├── unit/                            # Unit tests for nodes, services, and API
+    ├── integration/                     # Live API tests (requires mocked or real services)
+    └── non_regression/                  # E2E tests against golden dataset (TNR suite)
 ```
 
 ---
@@ -533,6 +528,39 @@ The response includes a `total_tokens_usage` object with per-node breakdowns (`o
 ---
 [![CI Pipeline](https://github.com/raydje/langgraph-agent-ia-for-misra-c/actions/workflows/ci.yml/badge.svg)](https://github.com/raydje/langgraph-agent-ia-for-misra-c/actions/workflows/ci.yml)
 ---
+
+## CI/CD Pipelines
+
+This project employs a robust multi-stage CI/CD architecture to ensure code quality, security, and production readiness.
+
+### 1. Standard CI Pipeline (`ci.yml`)
+Triggered on every **push** and **pull request** to the `main` branch.
+
+- **IaC Linting**: `kube-linter` validates Kubernetes manifests in `deploy/k8s/` against production best practices.
+- **Static Analysis & Linting**: 
+  - `ruff` for fast linting and formatting checks.
+  - `mypy` for strict static type checking.
+- **Security Scanning**:
+  - `CodeQL` for semantic code analysis and vulnerability detection.
+  - `bandit` for identifying common security issues in Python code.
+  - `pip-audit` for scanning dependencies for known vulnerabilities.
+- **Automated Testing**:
+  - **Unit Tests**: Runs `pytest` on `tests/unit/` with `pytest-cov` to enforce high coverage (98%+).
+  - **Integration Tests**: Validates connectivity with live APIs (Gemini, Pinecone, MongoDB Atlas) using dynamic IP whitelisting for the GitHub runner.
+- **Container Lifecycle**:
+  - **Docker Build**: Builds the production image using GHA layer caching.
+  - **Container Smoke Test**: Boots the built image via `docker compose` and verifies the `HEALTHCHECK` and `/health` endpoint pass.
+  - **Docker Push**: Upon successful validation on `main`, the image is automatically tagged and pushed to **GitHub Container Registry (GHCR)**.
+
+### 2. Non-Regression Pipeline (`non-regression.yml`)
+A manually triggered (**workflow_dispatch**) suite designed for deep validation without exhausting API quotas on every commit.
+
+- **Golden Dataset Testing**: Executes 10+ complex end-to-end test cases concurrently (`pytest -n 10`) against a persistent "golden" dataset.
+- **Live Service Validation**: Runs against the full production stack (Gemini, Pinecone, MongoDB Atlas) to catch regressions in agent reasoning or retrieval quality.
+- **Reporting**: Publishes a detailed `java-junit` test report directly to the GitHub workflow summary for easy pass/fail inspection of specific MISRA rules.
+
+---
+
 ## Setup
 
 ### 1. Clone and install
@@ -619,17 +647,16 @@ Swagger UI is available at `http://localhost:8000/docs`.
 
 ## Testing
 
-This project prioritizes high-quality, reliable unit testing. We currently maintain **98% unit test coverage** for core application modules.
+This project prioritizes high-quality, reliable unit testing. We currently maintain **98% unit test coverage** for core application modules. Full end-to-end validation is performed via the automated pipelines.
 
 ### Testing Strategy
 - **Unit Tests:** Located in `tests/unit/`. We use `pytest` with `pytest-asyncio` for asynchronous code.
-- **Mocking:** To ensure speed and isolation, we mock external services (Pinecone, MongoDB, Google Gemini) using `unittest.mock` (`AsyncMock`, `MagicMock`). We frequently use `object.__new__` to bypass `__init__` calls where SDK instantiation would otherwise be required.
-- **CI Requirements:**
-    - Linting: `ruff check .` and `ruff format --check .`
-    - Testing: `pytest tests/unit/ --cov=app`
+- **Mocking:** To ensure speed and isolation, we mock external services (Pinecone, MongoDB, Google Gemini) using `unittest.mock` (`AsyncMock`, `MagicMock`).
+- **Standard CI (`ci.yml`):** Automatically runs linting (`ruff`, `mypy`), security scans (`CodeQL`, `bandit`), and all unit/integration tests on every PR.
+- **Non-Regression (`non-regression.yml`):** Manually triggered suite that runs 10+ E2E tests in parallel against live services to ensure agent stability and accuracy.
 
-### Running Tests
-To run the full test suite locally (ensure your virtual environment is activated):
+### Running Tests Locally
+To run the full unit test suite (ensure your virtual environment is activated):
 ```bash
 pytest tests/unit/ --cov=app --cov-report=term-missing
 ```

@@ -1,70 +1,64 @@
 MyProjectCv/
-├── .env
-├── .gitignore
-├── pytest.ini
-├── requirements.txt
 ├── main.py                       # FastAPI entry → uvicorn main:app --reload
+├── requirements.txt
+├── docker-compose.yml
+├── Dockerfile
 │
 ├── app/
 │   ├── config.py                 # Pydantic Settings (.env loader)
-│   ├── utils.py                  # JSON response parser + structlog logger
+│   ├── utils.py                  # structlog logger initialization
 │   ├── models_pricing.py         # Gemini model pricing table
 │   │
 │   ├── auth/                     # Authentication sub-package
-│   │   ├── models.py             # Domain models: UserCreate, Principal, TokenResponse, APIKeyCreate/Response/Info, RefreshRequest
-│   │   ├── service.py            # Crypto primitives: hash_password, generate_api_key, create_access_token, create_refresh_token, decode_token
-│   │   ├── dependencies.py       # FastAPI Security dependency: get_current_principal (dual-token JWT + API key resolver)
-│   │   └── router.py             # Auth endpoints (mounted at /api/v1/auth)
+│   │   ├── models.py             # User, Token, API Key domain models
+│   │   ├── service.py            # Crypto primitives, JWT & API Key logic
+│   │   ├── dependencies.py       # Dual-token JWT + API key resolver
+│   │   └── router.py             # Auth endpoints (/api/v1/auth)
 │   │
 │   ├── models/
-│   │   ├── state.py              # ComplianceState TypedDict (LangGraph state)
-│   │   ├── requests.py           # ComplianceQueryRequest, IngestRuleRequest
-│   │   └── responses.py          # ComplianceQueryResponse, HealthResponse, IngestResponse
+│   │   └── state.py              # ComplianceState TypedDict (LangGraph state)
 │   │
 │   ├── graph/
 │   │   ├── builder.py            # StateGraph wiring + assemble_node (inline)
-│   │   ├── edges.py              # route_after_rag(), should_loop_or_finish(), route_after_critique()
+│   │   ├── edges.py              # Conditional routing logic
 │   │   └── nodes/
 │   │       ├── orchestrator.py   # Intent classifier (search/validate/explain)
-│   │       ├── rag.py            # Hybrid search: Pinecone dense + MongoDB sparse
+│   │       ├── rag.py            # Hybrid search: Pinecone + MongoDB
 │   │       ├── validation.py     # LLM compliance check (temp=0.1)
-│   │       ├── critique.py       # Hallucination reviewer (temp=0.0, 5 criteria)
-│   │       └── remedier.py       # Remediation suggester (temp=0.3): triggered when is_compliant=False
+│   │       ├── critique.py       # Hallucination reviewer (temp=0.0)
+│   │       └── remedier.py       # Remediation suggester (temp=0.2)
 │   │
 │   ├── services/
-│   │   ├── llm_service.py        # Gemini wrapper
-│   │   ├── embedding_service.py  # gemini-embedding-001 (768 dims)
-│   │   ├── pinecone_service.py   # Auto-creates index, query, upsert
-│   │   └── mongodb_service.py    # Async Motor CRUD + indexes
+│   │   ├── llm_service.py        # Gemini / LangChain wrappers
+│   │   ├── embedding_service.py  # gemini-embedding-001
+│   │   ├── pinecone_service.py   # Vector DB operations
+│   │   ├── mongodb_service.py    # Rule storage + Checkpointing support
+│   │   ├── usage_service.py      # Token/Cost tracking service
+│   │   └── service_container.py  # Singleton service registry
 │   │
 │   ├── api/
-│   │   ├── routes.py             # GET /health, POST /query, POST /seed, POST /replay, GET /history
-│   │   └── dependencies.py       # Graph + DB dependencies (lru_cache)
+│   │   ├── dependencies.py       # Graph & DB dependency injection
+│   │   ├── rate_limit.py         # Redis-backed rate limiter
+│   │   └── v1/
+│   │       ├── routes.py         # Main API endpoints (/query, /replay, /history)
+│   │       ├── requests.py       # API Pydantic request models
+│   │       └── responses.py      # API Pydantic response models
 │   │
 │   └── data/
-│       └── ingest.py             # MISRA ingestion → MongoDB + Pinecone
+│       └── ingest.py             # MISRA ingestion pipeline
 │
 ├── data/
 │   ├── misra_c_2023__headlines_for_cppcheck.txt
-│   └── all_supported_model.txt
+│   └── golden_dataset.json
+│
+├── deploy/
+│   └── k8s/                      # Kubernetes resources
 │
 └── tests/
-    ├── code_c_snippet_example.json
-    ├── misra_test_sample.c
-    └── unit/
-        ├── graph/
-        │   ├── test_builder.py
-        │   ├── test_edges.py
-        │   └── nodes/
-        │       ├── test_orchestrator.py
-        │       ├── test_rag.py
-        │       ├── test_validation.py
-        │       ├── test_critique.py
-        │       └── test_remedier.py
-        ├── services/
-        │   └── test_mongodb_service.py
-        └── utils/
-            └── test_utils.py
+    ├── unit/                     # Isolated component tests
+    ├── integration/              # Contract tests for external services
+    └── non_regression/           # Golden dataset E2E tests
+
 
 ---
 
