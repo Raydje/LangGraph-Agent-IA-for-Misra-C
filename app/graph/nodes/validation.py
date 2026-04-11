@@ -10,7 +10,6 @@ from app.services.llm_service import get_structured_llm
 from app.utils import extracting_tokens_metadata, logger
 
 
-# Structured output schema — guarantees valid typed output from the LLM
 class ValidationOutput(BaseModel):
     is_compliant: bool = Field(description="True only if the code fully satisfies all applicable retrieved rules.")
     validation_result: str = Field(
@@ -45,7 +44,8 @@ async def validation_node(state: ComplianceState) -> dict[str, Any]:
     iteration = state.get("iteration_count", 0)
     logger.info("Validation_node", query=query, code_snippet=code, iteration=iteration)
 
-    # Format retrieved rules — MISRA C:2023 IDs are either "MISRA_DIR_X.Y" or "MISRA_RULE_X.Y"
+    # The LLM must ground its validation against specific text rather than relying on its
+    # internal weights, so we inject the full retrieved rules into the context window here.
     rules_context = "\n\n".join(
         [
             f"Rule ID: {r['rule_id']}\nCategory: {r.get('category', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"
@@ -125,8 +125,7 @@ Provide your structured validation verdict."""
             "estimated_cost": 0.0,
         }
 
-    # Track validation tokens used
-    tokens_metadata = extracting_tokens_metadata(raw_result)  # Logs token usage and cost
+    tokens_metadata = extracting_tokens_metadata(raw_result)
     logger.info(
         "Validation_node_result",
         validation_result=result.validation_result,

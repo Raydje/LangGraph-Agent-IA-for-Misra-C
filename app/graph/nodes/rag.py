@@ -31,20 +31,17 @@ async def rag_node(state: ComplianceState, config: RunnableConfig) -> dict[str, 
     logger.info("RAG_node invoked", query=state.get("query", ""))
     query = state.get("query", "")
 
-    # 1. Embed the user's query
     vector = await embedding_service.get_embedding(query)
     logger.info("RAG_node - query embedded")
 
-    # 2. Build metadata filters strictly for MISRA C:2023
+    # Partition the vector space by standard using metadata filters to prevent cross-contamination
+    # (e.g., preventing AUTOSAR rules from bleeding into a MISRA query).
     metadata_filters = {"scope": state.get("standard", "MISRA C:2023")}
     logger.info("RAG_NODE scope", scope=metadata_filters["scope"])
 
-    # 3. Query Pinecone for top K matches (semantic search)
-    # Fetching the top 5 most relevant rules
     pinecone_results = await pinecone_service.query(vector=vector, top_k=5, filter=metadata_filters)
 
     matches = pinecone_results.get("matches", [])
-    # Extract the IDs and keep track of their relevance scores
     rule_ids = [match["id"] for match in matches]
     scores_map = {match["id"]: match.get("score", 0.0) for match in matches}
 
@@ -52,12 +49,12 @@ async def rag_node(state: ComplianceState, config: RunnableConfig) -> dict[str, 
     logger.info("RAG_node - Pinecone query completed", number_of_matches=len(matches))
     logger.info("RAG_node - retrieved  matching IDs from Pinecone", rule_ids=rule_ids)
     if rule_ids:
-        # 4. Fetch the full documents from MongoDB
+        # Pinecone only stores vectors and basic metadata. We fetch the full rule payload from
+        # MongoDB using the retrieved IDs to bypass Pinecone's payload limits and keep the index lightweight.
         mongo_docs = await mongo_db.get_misra_rules_by_pinecone_ids(rule_ids)
         logger.info(
             "RAG_node - retrieved  documents from MongoDB based on Pinecone IDs", number_of_documents=len(mongo_docs)
         )
-        # 5. Format the documents into the TypedDict expected by LangGraph
         for doc in mongo_docs:
             r_id = doc.get("rule_id", "")
 
@@ -72,8 +69,8 @@ async def rag_node(state: ComplianceState, config: RunnableConfig) -> dict[str, 
             }
             retrieved_rules.append(rule_entry)
 
-        # Ensure the final list is sorted by relevance score descending
+        # MongoDB's $in query does not guarantee the returned documents will preserve the relevance
+        # order of the Pinecone vector IDs, so we must re-sort them manually.
         retrieved_rules.sort(key=lambda x: x["relevance_score"], reverse=True)
     logger.info("RAG_node - formatted retrieved rules for state update", number_of_rules=len(retrieved_rules))
-    # 6. Return the state update dictionary.
     return {"retrieved_rules": retrieved_rules, "rag_query_used": query, "metadata_filters_applied": metadata_filters}

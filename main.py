@@ -34,14 +34,14 @@ async def lifespan(app: FastAPI):
         region=settings.pinecone_region,
     )
 
-    # Validate Redis connection (fail-fast with clear log) and create async client
+    # Fail-fast on Redis connection to ensure rate-limiting configuration
+    # errors are caught during startup rather than at runtime.
     redis_client = None
     try:
         _r = redis_sync.from_url(settings.redis_uri, socket_connect_timeout=3)
         _r.ping()
         _r.close()
         logger.info("[Startup] Redis connected", host=settings.redis_host, port=settings.redis_port)
-        # Create async Redis client for per-user rate limiting (sliding window)
         redis_client = redis_async.from_url(
             settings.redis_uri,
             encoding="utf-8",
@@ -52,9 +52,9 @@ async def lifespan(app: FastAPI):
 
     app.state.redis = redis_client
 
-    # Delegate service instantiation and cleanup to the centralised container.
-    # app.state holds the same references — used by route dependencies.
     async with create_service_container() as container:
+        # The service container manages connection lifecycles. We attach singletons to
+        # app.state so FastAPI route dependencies can access them without expensive re-instantiation per request.
         app.state.mongodb = container.mongodb
         app.state.pinecone = container.pinecone
         app.state.mongodb_checkpoint = container.mongodb_checkpoint
@@ -67,14 +67,13 @@ async def lifespan(app: FastAPI):
         )
         app.state.graph = await build_graph(checkpointer=checkpointer)
 
-        # Create auth indexes (idempotent — safe to call on every restart)
+        # Create auth indexes. MongoDB index creation is idempotent, making this safe to call on every boot.
         auth_db = container.mongodb.db
         await auth_db["users"].create_index("email", unique=True)
         await auth_db["api_keys"].create_index("key_id")
         await auth_db["api_keys"].create_index("user_id")
         logger.info("[Startup] Auth indexes ensured (users.email, api_keys.key_id, api_keys.user_id)")
 
-        # Create UsageService and its indexes
         usage_service = UsageService(db=auth_db)
         await usage_service.create_indexes()
         app.state.usage_service = usage_service
@@ -97,7 +96,6 @@ async def lifespan(app: FastAPI):
         logger.warning("[Shutdown] SlowAPI Redis close error", error=str(e))
 
 
-# Initialize FastAPI app with metadata for Swagger UI
 app = FastAPI(
     title="MISRA C:2023 Compliance Agent",
     description="Autonomous regulatory compliance analysis using a LangGraph multi-agent system.",
@@ -143,6 +141,5 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Include the routes defined in routes.py
 app.include_router(router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")

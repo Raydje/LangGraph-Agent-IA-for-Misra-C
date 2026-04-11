@@ -10,7 +10,6 @@ from app.services.llm_service import get_structured_llm
 from app.utils import extracting_tokens_metadata, logger
 
 
-# Structured output schema — guarantees valid typed output from the LLM
 class CritiqueOutput(BaseModel):
     approved: bool = Field(description="True only if the validation passes ALL 5 criteria.")
     feedback: str = Field(
@@ -112,7 +111,6 @@ Based on the 5 criteria, generate your structured verdict."""
             "approved": False,
         }
 
-    # Track critique tokens used
     tokens_metadata = extracting_tokens_metadata(raw_result)
     logger.info("Critique_node_result", approved=approved, feedback=feedback, tokens_metadata=tokens_metadata)
 

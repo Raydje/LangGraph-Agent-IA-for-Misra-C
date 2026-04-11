@@ -10,7 +10,6 @@ from app.services.llm_service import get_structured_llm
 from app.utils import extracting_tokens_metadata, logger
 
 
-# Structured output schema — guarantees valid typed output from the LLM
 class RemediationOutput(BaseModel):
     fixed_code_snippet: str = Field(description="The complete corrected C code, ready to compile.")
     remediation_explanation: str = Field(
@@ -37,7 +36,9 @@ async def remediate_code(state: ComplianceState) -> dict[str, Any]:
     cited_rules = state.get("cited_rules", [])
     retrieved_rules = state.get("retrieved_rules", [])
 
-    # Build a rich rules context filtered to only the rules actually cited
+    # We filter the context to only include rules explicitly cited during validation.
+    # Passing the entire retrieved rule set would dilute the context window and
+    # increase the chance of hallucinating unnecessary code changes.
     cited_set = set(cited_rules)
     cited_rules_context = "\n\n".join(
         f"Rule ID: {r['rule_id']}\nCategory: {r.get('category', 'Unknown')}\nTitle: {r['title']}\nText: {r['full_text']}"

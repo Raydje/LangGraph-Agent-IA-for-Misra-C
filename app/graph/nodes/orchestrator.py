@@ -10,13 +10,11 @@ from app.services.llm_service import get_structured_llm
 from app.utils import extracting_tokens_metadata, logger
 
 
-# 1. Define the desired structured output schema
 class OrchestratorOutput(BaseModel):
     intent: Literal["search", "validate", "explain"] = Field(description="The classified intent of the user's request.")
     reasoning: str = Field(description="A brief explanation (1-2 sentences) of why this intent was chosen.")
 
 
-# 2. Define the Orchestrator Node function
 async def orchestrate(state: ComplianceState) -> dict[str, Any]:
     """
     Analyzes the user's query and code snippet to determine the workflow intent.
@@ -26,11 +24,12 @@ async def orchestrate(state: ComplianceState) -> dict[str, Any]:
     query = state.get("query", "")
     code_snippet = state.get("code_snippet", "")
     logger.info("Orchestrator_node", query=query, code_snippet=code_snippet)
-    # Initialize the base LLM (temperature=0.0 for deterministic classification)
+
+    # Temperature is locked to 0.0 to prevent hallucinated intents and ensure
+    # consistent, deterministic classification for identical queries.
     settings = get_settings()
     structured_llm = get_structured_llm(OrchestratorOutput, temperature=settings.orchestrator_temperature)
 
-    # Create the prompt instructing the LLM on how to classify for MISRA C:2023
     prompt = ChatPromptTemplate.from_messages(
         [
             (
@@ -92,10 +91,11 @@ async def orchestrate(state: ComplianceState) -> dict[str, Any]:
             "estimated_cost": 0.0,
         }
 
-    # Extract token usage from the raw AIMessage (usage_metadata uses input_tokens/output_tokens)
+    # Extract token usage manually from the raw response because LangChain's structured
+    # output parser drops usage_metadata from the parsed Pydantic object.
     tokens_metadata = extracting_tokens_metadata(raw_result)
     logger.info("Orchestrator_node_result", intent=result.intent, reasoning=result.reasoning, **tokens_metadata)
-    # LangGraph nodes must return a dictionary containing the keys of the State to update
+
     return {
         "intent": result.intent,
         "orchestrator_reasoning": result.reasoning,
