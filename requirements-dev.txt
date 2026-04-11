@@ -1,0 +1,13 @@
+-r requirements.txt
+pytest==9.0.2
+pytest-asyncio==1.3.0
+pytest-cov==7.1.0
+pytest-mock==3.15.1
+pytest-xdist==3.6.1
+pytest-timeout==2.4.0
+ruff==0.3.5
+pre-commit==3.7.0
+types-python-jose
+mypy==1.15.0
+bandit==1.8.2
+pip-audit==2.8.0
